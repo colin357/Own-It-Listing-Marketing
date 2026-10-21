@@ -66,15 +66,26 @@ export function monthlyPayment(price: number, p: PaymentSettings): number {
   return (principal * r) / (1 - Math.pow(1 + r, -n));
 }
 
-/** Returns payment info when it should be shown for this listing, otherwise null. */
+/**
+ * Principal & interest teaser shown on the social graphics. Uses the rate
+ * sent with the listing, falling back to the loan officer's default.
+ */
 export function paymentInfo(l: Listing, lo: LoanOfficer) {
-  if (!lo.payment || !l.showPayment) return null;
+  if (!l.showPayment) return null;
   if (l.status === "just-sold" || l.status === "under-contract") return null;
-  const monthly = monthlyPayment(l.price, lo.payment);
+  const ratePct = l.financing?.ratePct ?? lo.payment?.ratePct;
+  if (ratePct == null) return null;
+  const settings: PaymentSettings = {
+    ratePct,
+    downPaymentPct: lo.payment?.downPaymentPct ?? 20,
+    termYears: lo.payment?.termYears ?? 30,
+  };
+  const monthly = monthlyPayment(l.price, settings);
+  const apr = l.financing?.ratePct != null ? l.financing.aprPct : undefined;
   return {
     monthly,
     label: `${formatPrice(monthly)}/mo*`,
-    disclaimer: `*Est. principal & interest only on a ${lo.payment.termYears}-yr fixed loan at ${lo.payment.ratePct}% interest with ${lo.payment.downPaymentPct}% down. Excludes taxes, insurance, HOA and PMI. Rates subject to change. Not a commitment to lend.`,
+    disclaimer: `*Est. principal & interest only on a ${settings.termYears}-yr fixed loan at ${ratePct}% interest${apr ? ` (${apr}% APR)` : ""} with ${settings.downPaymentPct}% down. Excludes taxes, insurance, HOA and PMI. Rates subject to change. Not a commitment to lend.`,
   };
 }
 
@@ -91,6 +102,8 @@ export const PAPER = "#f4f3f1";
 export const LINE = "#e4e3e0";
 export const DEFAULT_BRAND = INK;
 export const DEFAULT_ACCENT = "#8b3dff";
+/** Neutral accent for generated graphics (warm stone), so they suit any brand. */
+export const GRAPHIC_ACCENT = "#d9d2c5";
 
 /** Black or white, whichever reads better on `hex`. */
 export function readableOn(hex: string): string {
@@ -104,6 +117,14 @@ export function readableOn(hex: string): string {
   return 1.05 / (lum + 0.05) >= (lum + 0.05) / 0.05 ? "#ffffff" : INK;
 }
 
+/** Colors for the generated graphics: neutral unless the LO set their own accent. */
+export function graphicColors(lo: LoanOfficer) {
+  const brand = lo.brandColor || DEFAULT_BRAND;
+  const accent = lo.accentColor || GRAPHIC_ACCENT;
+  return { brand, accent, onBrand: readableOn(brand), onAccent: readableOn(accent) };
+}
+
+/** Colors for the web kit page (Own It purple by default). */
 export function brandColors(lo: LoanOfficer) {
   const brand = lo.brandColor || DEFAULT_BRAND;
   const accent = lo.accentColor || DEFAULT_ACCENT;

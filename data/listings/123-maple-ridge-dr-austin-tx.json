@@ -27,7 +27,11 @@
     "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=1200&q=80&fm=jpg"
   ],
   "listingUrl": "https://example.com/listings/123-maple-ridge",
-  "openHouse": { "date": "2026-10-25", "startTime": "1:00 PM", "endTime": "4:00 PM" },
+  "openHouse": {
+    "date": "2026-10-25",
+    "startTime": "1:00 PM",
+    "endTime": "4:00 PM"
+  },
   "agent": {
     "name": "Taylor Morgan",
     "phone": "(512) 555-0199",
@@ -37,5 +41,11 @@
   },
   "showPayment": true,
   "createdAt": "2026-10-20T15:00:00.000Z",
-  "updatedAt": "2026-10-20T15:00:00.000Z"
+  "updatedAt": "2026-10-20T15:00:00.000Z",
+  "financing": {
+    "ratePct": 6.375,
+    "aprPct": 6.512,
+    "fhaRatePct": 5.99,
+    "fhaAprPct": 6.85
+  }
 }

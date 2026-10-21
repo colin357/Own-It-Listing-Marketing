@@ -3,25 +3,25 @@ import { getKit } from "@/lib/listings";
 import { buildCaptions } from "@/lib/captions";
 import { assetFilename, renderAssets } from "@/lib/render/render";
 import { pngToLetterPdf } from "@/lib/render/pdf";
-import { ASSETS, type AssetName } from "@/lib/render/templates";
+import { ASSETS, assetsFor, isPrintAsset } from "@/lib/render/templates";
 
 export const maxDuration = 60;
 
-/** Everything in one ZIP: all PNGs, the flyer PDF and a captions.txt. */
+/** Everything in one ZIP: all PNGs, the flyer PDFs and a captions.txt. */
 export async function GET(_req: Request, ctx: RouteContext<"/l/[slug]/download">) {
   const { slug } = await ctx.params;
   const kit = await getKit(slug);
   if (!kit) return new Response("Not found", { status: 404 });
   const { listing, lo } = kit;
 
-  const names = Object.keys(ASSETS) as AssetName[];
+  const names = assetsFor(listing, lo);
   const images = await renderAssets(listing, lo, names);
   const files: Record<string, Uint8Array> = {};
   for (const [i, res] of images.entries()) {
     const buf = new Uint8Array(await res.arrayBuffer());
     files[assetFilename(listing, names[i])] = buf;
-    if (names[i] === "flyer") {
-      files[`${listing.slug}-flyer.pdf`] = await pngToLetterPdf(buf, `Flyer – ${listing.address}`);
+    if (isPrintAsset(names[i])) {
+      files[`${listing.slug}-${names[i]}.pdf`] = await pngToLetterPdf(buf, `${ASSETS[names[i]].label} – ${listing.address}`);
     }
   }
   const captions = buildCaptions(listing, lo)

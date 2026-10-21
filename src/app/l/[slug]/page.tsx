@@ -14,7 +14,7 @@ import {
   statusLabel,
   streetLine,
 } from "@/lib/format";
-import { ASSETS, type AssetName } from "@/lib/render/templates";
+import { ASSETS, assetsFor, isPrintAsset } from "@/lib/render/templates";
 import { CopyButton } from "@/components/CopyButton";
 import { ShareButton } from "@/components/ShareButton";
 
@@ -56,7 +56,7 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
   const pay = paymentInfo(l, lo);
   const oh = formatOpenHouse(l);
   const v = l.updatedAt;
-  const order: AssetName[] = ["square", "details", "story", "landscape", "flyer"];
+  const order = assetsFor(l, lo);
   const agentFirst = l.agent.name.split(" ")[0];
   const loFirst = lo.name.split(" ")[0];
   const [wordA, wordB] = splitName(lo.name);
@@ -186,8 +186,8 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
                       <a className="textlink" href={assetUrl(l.slug, file, v, true)}>
                         PNG
                       </a>
-                      {name === "flyer" ? (
-                        <a className="textlink" href={assetUrl(l.slug, "flyer.pdf", v, true)}>
+                      {isPrintAsset(name) ? (
+                        <a className="textlink" href={assetUrl(l.slug, `${name}.pdf`, v, true)}>
                           PDF
                         </a>
                       ) : null}

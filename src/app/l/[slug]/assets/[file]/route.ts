@@ -1,7 +1,7 @@
 import { getKit } from "@/lib/listings";
 import { assetFilename, renderAssets } from "@/lib/render/render";
 import { pngToLetterPdf } from "@/lib/render/pdf";
-import { isAssetName } from "@/lib/render/templates";
+import { ASSETS, assetsFor, isAssetName, isPrintAsset } from "@/lib/render/templates";
 
 // Images are cached at the CDN; the kit page appends ?v=<updatedAt> so edits bust the cache.
 const CACHE = "public, max-age=3600, s-maxage=604800, stale-while-revalidate=86400";
@@ -11,10 +11,10 @@ export async function GET(req: Request, ctx: RouteContext<"/l/[slug]/assets/[fil
   const match = /^([a-z]+)\.(png|pdf)$/.exec(file);
   if (!match || !isAssetName(match[1])) return new Response("Not found", { status: 404 });
   const [, name, ext] = match;
-  if (ext === "pdf" && name !== "flyer") return new Response("Not found", { status: 404 });
+  if (ext === "pdf" && !isPrintAsset(name)) return new Response("Not found", { status: 404 });
 
   const kit = await getKit(slug);
-  if (!kit) return new Response("Not found", { status: 404 });
+  if (!kit || !assetsFor(kit.listing, kit.lo).includes(name)) return new Response("Not found", { status: 404 });
 
   const download = new URL(req.url).searchParams.has("download");
   const filename = assetFilename(kit.listing, name).replace(/\.png$/, `.${ext}`);
@@ -26,7 +26,7 @@ export async function GET(req: Request, ctx: RouteContext<"/l/[slug]/assets/[fil
       headers: { "Content-Type": "image/png", "Cache-Control": CACHE, "Content-Disposition": disposition },
     });
   }
-  const pdf = await pngToLetterPdf(await image.arrayBuffer(), `Flyer – ${kit.listing.address}`);
+  const pdf = await pngToLetterPdf(await image.arrayBuffer(), `${ASSETS[name].label} – ${kit.listing.address}`);
   return new Response(Buffer.from(pdf), {
     headers: { "Content-Type": "application/pdf", "Cache-Control": CACHE, "Content-Disposition": disposition },
   });

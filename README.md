@@ -17,13 +17,15 @@ https://your-domain.com/l/123-maple-ridge-dr-austin-tx
 | Story | 1080×1920 | IG / FB Stories, Reels cover |
 | Landscape | 1200×630 | Facebook / LinkedIn / link previews (also the page's OG image) |
 | Flyer | 8.5×11 PNG + PDF | Print, with QR codes to the listing and LO's pre-approval link |
+| Payment options flyer | 8.5×11 PNG + PDF | Three PITI scenarios: Conventional 5% down, Conventional 20% down, FHA 3.5% down (needs a rate) |
 | Captions | — | Instagram, Facebook, LinkedIn, text message, email-to-sphere |
 | Download all | .zip | Everything above plus `captions.txt` |
 
-The kit page, admin and graphics all use the Own It Social design language from
-ownitsocial.com: Archivo Black display type, Montserrat body copy, ink/paper/purple
-(`#0A0A0A` / `#F4F3F1` / `#8B3DFF`). A loan officer's brand/accent colors replace the black and
-purple when they're set, and text colors flip automatically to stay readable.
+The kit page and admin use the Own It Social design language from ownitsocial.com: Archivo Black
+display type, Montserrat body copy, ink/paper/purple (`#0A0A0A` / `#F4F3F1` / `#8B3DFF`). The
+generated graphics use the same type in a neutral black/white/stone palette so they suit any
+brand. A loan officer's brand/accent colors replace the defaults when set, and text colors flip
+automatically to stay readable.
 
 Every asset is co-branded (agent + LO headshots), uses the LO's brand colors, and carries the
 compliance line (LO NMLS, company NMLS, Equal Housing Opportunity, optional custom disclaimer).
@@ -90,8 +92,27 @@ curl -X POST https://your-domain.com/api/listings \
   }'
 ```
 
-Response (201) includes `url` (the link to send the agent), `downloadUrl`, `flyerPdfUrl` and direct
-`assets.*` image URLs — so a Zap can create the kit and then text/email the link in the next step.
+#### Financing fields (payment options flyer)
+
+Send the rate with the listing to unlock the payment-options flyer and the "Est. $X/mo" teaser:
+
+| Field | Aliases | |
+| --- | --- | --- |
+| `rate` | `ratePct`, `interestRate` | Conventional note rate, e.g. `6.375` (required for payments) |
+| `apr` | `aprPct` | Conventional APR. **Send this** — Reg Z requires APR when ads state a rate or payment |
+| `fhaRate` | `fhaRatePct` | FHA note rate (defaults to `rate`) |
+| `fhaApr` | `fhaAprPct` | FHA APR |
+| `annualTaxes` | `taxes` | Actual annual property taxes (from MLS). Otherwise estimated by state |
+| `annualInsurance` | `insurance` | Annual homeowners insurance. Otherwise estimated by state |
+| `hoaMonthly` | `hoa` | Added to every scenario |
+
+Scenarios are 30-year fixed. Conventional 5% down includes estimated PMI; FHA includes the 1.75%
+upfront MIP financed into the loan plus annual MIP. All assumptions (state tax/insurance tables,
+PMI and MIP rates) live in `src/lib/mortgage.ts`. If a listing has no rate, the loan officer's
+default rate is used; with neither, the payment flyer is simply omitted.
+
+Response (201) includes `url` (the link to send the agent), `downloadUrl`, `pdfs.*` (flyer PDFs) and
+direct `assets.*` image URLs — so a Zap can create the kit and then text/email the link in the next step.
 
 The API is forgiving so no-code tools are easy to map: prices like `"$685,000"`, flat agent fields
 (`agentName`, `agentPhone`, `agentEmail`, `agentBrokerage`, `agentHeadshotUrl`), flat open-house fields
@@ -116,6 +137,7 @@ src/app/admin/               Admin UI (basic auth via src/proxy.ts) + Blob uploa
 src/app/api/                 Bearer-token JSON API
 src/lib/render/templates.tsx All graphic templates — edit here to change designs
 src/lib/captions.ts          Caption copy
+src/lib/mortgage.ts          PITI scenarios + state tax/insurance estimates
 src/lib/store.ts             Upstash Redis / local JSON storage
 src/lib/validate.ts          Input normalization for API + forms
 assets/fonts/                Archivo + Montserrat (OFL), used by both the pages and the graphics

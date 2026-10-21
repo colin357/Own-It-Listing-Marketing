@@ -8,7 +8,7 @@ type Ctx = RouteContext<"/api/listings/[slug]">;
 export async function GET(req: Request, ctx: Ctx) {
   if (!isAuthorizedApiRequest(req)) return unauthorized();
   const listing = await listings.get((await ctx.params).slug);
-  return listing ? Response.json(withLinks(req, listing)) : Response.json({ error: "Not found" }, { status: 404 });
+  return listing ? Response.json(await withLinks(req, listing)) : Response.json({ error: "Not found" }, { status: 404 });
 }
 
 /** PUT replaces the listing. */
@@ -16,7 +16,7 @@ export async function PUT(req: Request, ctx: Ctx) {
   if (!isAuthorizedApiRequest(req)) return unauthorized();
   try {
     const listing = await updateListing((await ctx.params).slug, asRecord(await readJson(req)));
-    return listing ? Response.json(withLinks(req, listing)) : Response.json({ error: "Not found" }, { status: 404 });
+    return listing ? Response.json(await withLinks(req, listing)) : Response.json({ error: "Not found" }, { status: 404 });
   } catch (err) {
     return errorResponse(err);
   }
@@ -33,7 +33,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
     const agentPatch = patch.agent && typeof patch.agent === "object" ? patch.agent : {};
     const merged = { ...existing, ...patch, agent: { ...existing.agent, ...agentPatch } };
     const listing = await updateListing(slug, merged);
-    return Response.json(withLinks(req, listing!));
+    return Response.json(await withLinks(req, listing!));
   } catch (err) {
     return errorResponse(err);
   }

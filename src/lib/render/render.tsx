@@ -1,12 +1,13 @@
 import "server-only";
 import { ImageResponse } from "next/og";
 import type { Listing, LoanOfficer } from "../types";
-import { brandColors } from "../format";
+import { graphicColors } from "../format";
+import { paymentOptions } from "../mortgage";
 import { inlineImage, loadFonts, qrDataUrl } from "./resources";
 import { ASSETS, type AssetName, type RenderData } from "./templates";
 
 async function buildRenderData(listing: Listing, lo: LoanOfficer): Promise<RenderData> {
-  const colors = brandColors(lo);
+  const colors = graphicColors(lo);
   const [photos, loHeadshot, agentHeadshot, logo, applyQr, listingQr] = await Promise.all([
     // Fetch a couple of spares so a broken URL doesn't leave a slot empty.
     Promise.all(listing.photos.slice(0, 6).map((url) => inlineImage(url))),
@@ -27,6 +28,7 @@ async function buildRenderData(listing: Listing, lo: LoanOfficer): Promise<Rende
     applyQr,
     listingQr,
     ...colors,
+    payments: paymentOptions(listing, lo),
   };
 }
 

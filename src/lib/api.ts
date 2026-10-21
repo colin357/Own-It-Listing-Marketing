@@ -2,21 +2,22 @@ import "server-only";
 import type { Listing } from "./types";
 import { ValidationError } from "./validate";
 import { originFromRequest } from "./site";
-import { ASSETS } from "./render/templates";
+import { loanOfficers } from "./store";
+import { ASSETS, assetsFor, isPrintAsset } from "./render/templates";
 
 /** Public representation returned by the API: the record plus share links. */
-export function withLinks(req: Request, l: Listing) {
+export async function withLinks(req: Request, l: Listing) {
   const origin = originFromRequest(req);
   const v = encodeURIComponent(l.updatedAt);
-  const assets = Object.fromEntries(
-    Object.keys(ASSETS).map((name) => [name, `${origin}/l/${l.slug}/assets/${name}.png?v=${v}`]),
-  );
+  const lo = await loanOfficers.get(l.loanOfficerSlug);
+  const names = lo ? assetsFor(l, lo) : (Object.keys(ASSETS) as (keyof typeof ASSETS)[]);
+  const base = `${origin}/l/${l.slug}/assets`;
   return {
     ...l,
     url: `${origin}/l/${l.slug}`,
     downloadUrl: `${origin}/l/${l.slug}/download`,
-    flyerPdfUrl: `${origin}/l/${l.slug}/assets/flyer.pdf?v=${v}`,
-    assets,
+    assets: Object.fromEntries(names.map((name) => [name, `${base}/${name}.png?v=${v}`])),
+    pdfs: Object.fromEntries(names.filter(isPrintAsset).map((name) => [name, `${base}/${name}.pdf?v=${v}`])),
   };
 }
 

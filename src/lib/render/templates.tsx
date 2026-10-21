@@ -14,6 +14,7 @@ import {
   statusLabel,
   streetLine,
 } from "../format";
+import { paymentOptions, type PaymentOptions } from "../mortgage";
 
 /**
  * Satori templates (rendered to PNG by next/og). Satori supports a subset of
@@ -38,6 +39,7 @@ export interface RenderData {
   accent: string;
   onBrand: string;
   onAccent: string;
+  payments: PaymentOptions | null;
 }
 
 const MUTED = "#5b5b5b";
@@ -395,59 +397,67 @@ export function LandscapePost(d: RenderData) {
   );
 }
 
-/** 1080×1350 — 4:5 portrait "feature" post with a photo grid and highlights. */
+/** 1080×1350 — 4:5 editorial "feature" post: hero photo, filmstrip, clean details. */
 export function DetailsPost(d: RenderData) {
   const l = d.listing;
   const p = d.photos;
   const pay = payLabel(d);
-  const highlights = l.highlights.slice(0, 4);
+  const strip = [p[1], p[2], p[3]].map((x) => x ?? p[0]);
+  const stats = statItems(l);
   return (
-    <div style={{ display: "flex", flexDirection: "column", width: "100%", height: "100%", background: PAPER }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", padding: "48px 56px 28px" }}>
-        <Headline l={l} width={600} max={110} color={INK} />
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
-          <div style={{ display: "flex", ...head(64, INK) }}>{formatPrice(l.price)}</div>
-          {pay ? <div style={{ display: "flex", ...label(17, d.accent) }}>{pay}</div> : null}
+    <div style={{ display: "flex", flexDirection: "column", width: "100%", height: "100%", background: "#fff" }}>
+      <div style={{ display: "flex", position: "relative", height: 730 }}>
+        <Photo src={p[0]} style={{ ...fill, width: "100%", height: "100%" }} />
+        <div
+          style={{ ...fill, display: "flex", backgroundImage: "linear-gradient(180deg, rgba(10,10,10,0.55) 0%, rgba(10,10,10,0) 30%)" }}
+        />
+        <div style={{ position: "absolute", top: 44, left: 56, right: 56, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <Pill text={statusLabel(l)} bg="#fff" color={INK} size={20} />
+          <div style={{ display: "flex", ...label(20, "#fff") }}>{`${l.city}, ${l.state}`}</div>
         </div>
       </div>
-      <div style={{ display: "flex", height: 560, gap: 8, padding: "0 56px" }}>
-        <Photo src={p[0]} style={{ width: 640, height: "100%" }} />
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, flexGrow: 1 }}>
-          <Photo src={p[1] ?? p[0]} style={{ width: "100%", height: 276 }} />
-          <Photo src={p[2] ?? p[0]} style={{ width: "100%", height: 276 }} />
-        </div>
+      <div style={{ display: "flex", gap: 6, height: 200, paddingTop: 6 }}>
+        {strip.map((src, i) => (
+          <Photo key={i} src={src} style={{ width: 356, height: "100%" }} />
+        ))}
       </div>
-      <div style={{ display: "flex", flexDirection: "column", padding: "28px 56px 0", gap: 18, flexGrow: 1 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <div style={{ display: "flex", ...label(26, INK, 900) }}>{streetLine(l)}</div>
+      <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, padding: "38px 56px 0", gap: 22 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 30 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, flexShrink: 1 }}>
+            <div style={{ display: "flex", ...head(fit(streetLine(l), 600, 58), INK), lineHeight: 1 }}>{streetLine(l)}</div>
             <div style={{ display: "flex", ...label(18, MUTED) }}>{cityLine(l)}</div>
           </div>
-          {openHousePill(d, 16)}
-        </div>
-        <div style={{ display: "flex", gap: 24 }}>
-          <StatBoxes l={l} size={36} width={450} />
-          <div style={{ display: "flex", flexDirection: "column", flexGrow: 1 }}>
-            {highlights.map((h, i) => (
-              <div
-                key={h}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: "7px 0",
-                  borderTop: i ? `2px solid ${LINE}` : "none",
-                  ...body(19, INK, 500),
-                }}
-              >
-                <div style={{ display: "flex", width: 8, height: 8, borderRadius: 8, background: d.accent }} />
-                {h}
-              </div>
-            ))}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, flexShrink: 0 }}>
+            <div style={{ display: "flex", ...head(58, INK), lineHeight: 1 }}>{formatPrice(l.price)}</div>
+            {pay ? <div style={{ display: "flex", ...label(15, MUTED) }}>{pay}</div> : null}
           </div>
         </div>
+        <div style={{ display: "flex", borderTop: `2px solid ${INK}`, borderBottom: `2px solid ${LINE}` }}>
+          {stats.map(([v, k], i) => (
+            <div
+              key={k}
+              style={{
+                display: "flex",
+                alignItems: "baseline",
+                gap: 10,
+                flexGrow: 1,
+                padding: "16px 0",
+                paddingLeft: i ? 24 : 0,
+                borderLeft: i ? `2px solid ${LINE}` : "none",
+              }}
+            >
+              <div style={{ display: "flex", ...head(34, INK), lineHeight: 1 }}>{v}</div>
+              <div style={{ display: "flex", ...label(14, MUTED) }}>{k}</div>
+            </div>
+          ))}
+          {formatOpenHouse(l) ? (
+            <div style={{ display: "flex", alignItems: "center", paddingLeft: 24, borderLeft: `2px solid ${LINE}` }}>
+              <div style={{ display: "flex", ...label(13, INK) }}>{`Open ${formatOpenHouse(l)}`}</div>
+            </div>
+          ) : null}
+        </div>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", background: "#fff", borderTop: `2px solid ${LINE}`, padding: "22px 56px 18px", gap: 14 }}>
+      <div style={{ display: "flex", flexDirection: "column", padding: "0 56px 22px", gap: 14 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           {agentPerson(d, 80, INK, MUTED, LINE)}
           {loPerson(d, 80, INK, MUTED, LINE)}
@@ -497,7 +507,7 @@ export function Flyer(d: RenderData) {
           <div style={{ display: "flex", flexWrap: "wrap" }}>
             {l.highlights.slice(0, 4).map((h) => (
               <div key={h} style={{ display: "flex", alignItems: "center", gap: 10, width: 370, padding: "5px 0", ...body(18, INK, 500) }}>
-                <div style={{ display: "flex", width: 8, height: 8, borderRadius: 8, background: d.accent }} />
+                <div style={{ display: "flex", width: 8, height: 8, borderRadius: 8, background: d.brand }} />
                 {h}
               </div>
             ))}
@@ -562,19 +572,181 @@ export function Flyer(d: RenderData) {
   );
 }
 
+/** 1275×1650 — US Letter "payment options" flyer: three PITI scenarios. */
+export function PaymentsFlyer(d: RenderData) {
+  const l = d.listing;
+  const opts = d.payments;
+  if (!opts) return <div style={{ display: "flex" }} />;
+  const lowest = Math.min(...opts.scenarios.map((s) => s.total));
+  const money = (n: number) => formatPrice(Math.round(n));
+  const hasHoa = opts.scenarios.some((s) => s.hoa > 0);
+  const headSize = fit(`from ${money(lowest)}/mo.*`, 1000, 104);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", width: "100%", height: "100%", background: "#fff" }}>
+      <div style={{ display: "flex", height: 470, position: "relative" }}>
+        <Photo src={d.photos[0]} style={{ ...fill, width: "100%", height: "100%" }} />
+        <div
+          style={{ ...fill, display: "flex", backgroundImage: "linear-gradient(90deg, rgba(10,10,10,0.88) 0%, rgba(10,10,10,0.55) 55%, rgba(10,10,10,0.1) 100%)" }}
+        />
+        <div style={{ position: "absolute", left: 60, top: 50, bottom: 44, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ display: "flex", ...label(20, "rgba(255,255,255,0.8)") }}>What it costs to own</div>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <div style={{ display: "flex", ...head(headSize, "#fff") }}>Own this home</div>
+              <div style={{ display: "flex", ...head(headSize, "#fff") }}>{`from ${money(lowest)}/mo.*`}</div>
+            </div>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ display: "flex", ...label(22, "#fff", 900) }}>{`${streetLine(l)} · ${cityLine(l)}`}</div>
+            <div style={{ display: "flex", ...label(17, "rgba(255,255,255,0.75)") }}>
+              {[`List price ${formatPrice(l.price)}`, ...statItems(l).map(([v, k]) => `${v} ${k}`)].join("  ·  ")}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style={{ display: "flex", height: 8, background: d.accent }} />
+
+      <div style={{ display: "flex", gap: 22, padding: "38px 60px 0" }}>
+        {opts.scenarios.map((s) => {
+          const rows: [string, number][] = [
+            ["Principal & interest", s.principalInterest],
+            [opts.taxesEstimated ? "Property taxes (est.)" : "Property taxes", s.taxes],
+            [opts.insuranceEstimated ? "Insurance (est.)" : "Homeowners insurance", s.insurance],
+            [`Mortgage insurance (${s.miLabel})`, s.mortgageInsurance],
+          ];
+          if (hasHoa) rows.push(["HOA", s.hoa]);
+          const best = s.total === lowest;
+          return (
+            <div
+              key={s.id}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                width: 368,
+                border: `2px solid ${best ? INK : LINE}`,
+              }}
+            >
+              <div style={{ display: "flex", flexDirection: "column", background: best ? INK : PAPER, padding: "22px 24px 20px", gap: 6 }}>
+                <div style={{ display: "flex", ...label(18, best ? "#fff" : INK, 900) }}>{s.name}</div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", minHeight: 28 }}>
+                  <div style={{ display: "flex", ...label(15, best ? "rgba(255,255,255,0.75)" : MUTED) }}>{s.detail}</div>
+                  {best ? <Pill text="Lowest payment" bg={d.accent} color={d.onAccent} size={11} /> : null}
+                </div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", padding: "24px 24px 26px", gap: 18, flexGrow: 1 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                    <div style={{ display: "flex", ...head(64, INK), lineHeight: 1 }}>{money(s.total)}</div>
+                    <div style={{ display: "flex", ...label(16, MUTED) }}>/mo</div>
+                  </div>
+                  <div style={{ display: "flex", ...body(17, INK, 500) }}>{`${money(s.downPayment)} down payment`}</div>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column" }}>
+                  {rows.map(([name, value]) => (
+                    <div
+                      key={name}
+                      style={{ display: "flex", justifyContent: "space-between", padding: "12px 0", borderTop: `1.5px solid ${LINE}`, ...body(17, INK) }}
+                    >
+                      <div style={{ display: "flex", color: MUTED }}>{name}</div>
+                      <div style={{ display: "flex", fontWeight: 600 }}>{value > 0 ? money(value) : "—"}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: "auto" }}>
+                  <div style={{ display: "flex", ...label(13, INK) }}>
+                    {`${s.ratePct}% rate${s.aprPct ? ` · ${s.aprPct}% APR` : ""}`}
+                  </div>
+                  <div style={{ display: "flex", ...body(14, MUTED) }}>{`30-yr fixed · ${money(s.loanAmount)} loan`}</div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ display: "flex", flexGrow: 1, alignItems: "center", gap: 36, padding: "30px 60px" }}>
+        <Avatar src={d.loHeadshot} name={d.lo.name} size={150} ring={LINE} />
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, flexGrow: 1 }}>
+          <div style={{ display: "flex", ...label(15, MUTED) }}>Find the right option for you</div>
+          <div style={{ display: "flex", ...head(46, INK), lineHeight: 1 }}>{d.lo.name}</div>
+          <div style={{ display: "flex", ...body(19, INK, 500) }}>
+            {[d.lo.title, `NMLS #${d.lo.nmls}`, d.lo.company].filter(Boolean).join(" · ")}
+          </div>
+          <div style={{ display: "flex", ...body(19, INK) }}>{[d.lo.phone, d.lo.email].filter(Boolean).join("  ·  ")}</div>
+        </div>
+        {d.applyQr ? (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+            <div style={{ display: "flex", border: `2px solid ${LINE}`, padding: 8 }}>
+              <img src={d.applyQr} style={{ width: 150, height: 150 }} />
+            </div>
+            <div style={{ display: "flex", ...label(12, INK) }}>Get pre-approved</div>
+          </div>
+        ) : null}
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", background: PAPER, borderTop: `2px solid ${LINE}`, padding: "18px 60px 20px", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <Avatar src={d.agentHeadshot} name={l.agent.name} size={56} ring={LINE} />
+          <div style={{ display: "flex", ...body(16, INK) }}>
+            {`Listed by ${l.agent.name}${l.agent.brokerage ? `, ${l.agent.brokerage}` : ""}${l.agent.phone ? ` · ${l.agent.phone}` : ""}`}
+          </div>
+        </div>
+        <div style={{ display: "flex", ...body(11.5, MUTED), lineHeight: 1.35 }}>
+          {`*${opts.disclaimer} ${complianceLine(d.lo)}.${d.lo.disclaimer ? ` ${d.lo.disclaimer}` : ""}`}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export interface AssetDef {
+  label: string;
+  use: string;
+  size: string;
+  width: number;
+  height: number;
+  render: (d: RenderData) => ReactNode;
+  /** Also offered as a letter-size PDF. */
+  print?: boolean;
+  /** Only available when the listing has a rate (see paymentOptions). */
+  needsPayments?: boolean;
+}
+
 export const ASSETS = {
   square: { label: "Feed post", use: "Instagram · Facebook", size: "1080 × 1080", width: 1080, height: 1080, render: SquarePost },
   details: { label: "Feature post", use: "Instagram 4:5", size: "1080 × 1350", width: 1080, height: 1350, render: DetailsPost },
   story: { label: "Story", use: "Stories · Reels cover", size: "1080 × 1920", width: 1080, height: 1920, render: StoryPost },
   landscape: { label: "Link post", use: "Facebook · LinkedIn", size: "1200 × 630", width: 1200, height: 630, render: LandscapePost },
-  flyer: { label: "Flyer", use: "Print · 8.5 × 11", size: "1275 × 1650", width: 1275, height: 1650, render: Flyer },
-} satisfies Record<
-  string,
-  { label: string; use: string; size: string; width: number; height: number; render: (d: RenderData) => ReactNode }
->;
+  flyer: { label: "Flyer", use: "Print · 8.5 × 11", size: "1275 × 1650", width: 1275, height: 1650, render: Flyer, print: true },
+  payments: {
+    label: "Payment options flyer",
+    use: "Print · 8.5 × 11",
+    size: "1275 × 1650",
+    width: 1275,
+    height: 1650,
+    render: PaymentsFlyer,
+    print: true,
+    needsPayments: true,
+  },
+} satisfies Record<string, AssetDef>;
 
 export type AssetName = keyof typeof ASSETS;
 
 export function isAssetName(s: string): s is AssetName {
   return s in ASSETS;
+}
+
+export function isPrintAsset(name: AssetName): boolean {
+  const a: AssetDef = ASSETS[name];
+  return !!a.print;
+}
+
+/** Assets offered for a listing, in display order. */
+export function assetsFor(l: Listing, lo: LoanOfficer): AssetName[] {
+  const hasPayments = paymentOptions(l, lo) != null;
+  return (Object.keys(ASSETS) as AssetName[]).filter((name) => {
+    const a: AssetDef = ASSETS[name];
+    return !a.needsPayments || hasPayments;
+  });
 }

@@ -1,4 +1,4 @@
-import type { Agent, Listing, ListingStatus, LoanOfficer, OpenHouse, PaymentSettings } from "./types";
+import type { Agent, Financing, Listing, ListingStatus, LoanOfficer, OpenHouse, PaymentSettings } from "./types";
 import { LISTING_STATUSES } from "./types";
 import { slugify } from "./format";
 
@@ -105,6 +105,27 @@ export function parseListingInput(raw: Raw, existing?: Listing): Omit<Listing, "
     };
   }
 
+  let financing: Financing | undefined;
+  const rawRate = pick(raw, "rate", "ratePct", "interestRate", "financing.ratePct");
+  const ratePct = num(String(rawRate ?? "").replace(/%/g, ""));
+  if (rawRate != null && rawRate !== "" && ratePct == null) issues.push("rate must be a number like 6.5");
+  if (ratePct != null) {
+    financing = {
+      ratePct,
+      aprPct: num(pick(raw, "apr", "aprPct", "financing.aprPct")),
+      fhaRatePct: num(pick(raw, "fhaRate", "fhaRatePct", "financing.fhaRatePct")),
+      fhaAprPct: num(pick(raw, "fhaApr", "fhaAprPct", "financing.fhaAprPct")),
+      annualTaxes: num(pick(raw, "annualTaxes", "taxes", "financing.annualTaxes")),
+      annualInsurance: num(pick(raw, "annualInsurance", "insurance", "financing.annualInsurance")),
+      hoaMonthly: num(pick(raw, "hoaMonthly", "hoa", "financing.hoaMonthly")),
+    };
+    const bad = (["ratePct", "aprPct", "fhaRatePct", "fhaAprPct"] as const).filter((k) => {
+      const v = financing![k];
+      return v != null && (v <= 0 || v > 20);
+    });
+    if (bad.length) issues.push(`${bad.join(", ")} must be an annual percentage like 6.5`);
+  }
+
   const listing = {
     slug: str(raw.slug) ? slugify(String(raw.slug)) : existing?.slug,
     loanOfficerSlug: str(pick(raw, "loanOfficerSlug", "loanOfficer")) ?? "",
@@ -128,6 +149,7 @@ export function parseListingInput(raw: Raw, existing?: Listing): Omit<Listing, "
     listingUrl: url(raw.listingUrl, "listingUrl", issues),
     openHouse,
     agent,
+    financing,
     showPayment: bool(raw.showPayment, existing?.showPayment ?? true),
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,

@@ -31,6 +31,13 @@ export function listingToValues(l: Listing): Record<string, string> {
     agentEmail: s(l.agent.email),
     agentLicense: s(l.agent.license),
     agentHeadshotUrl: s(l.agent.headshotUrl),
+    rate: s(l.financing?.ratePct),
+    apr: s(l.financing?.aprPct),
+    fhaRate: s(l.financing?.fhaRatePct),
+    fhaApr: s(l.financing?.fhaAprPct),
+    annualTaxes: s(l.financing?.annualTaxes),
+    annualInsurance: s(l.financing?.annualInsurance),
+    hoaMonthly: s(l.financing?.hoaMonthly),
     showPayment: String(l.showPayment),
   };
 }

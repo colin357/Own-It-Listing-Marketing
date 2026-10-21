@@ -61,6 +61,25 @@ export interface OpenHouse {
   endTime: string;
 }
 
+/**
+ * Per-listing financing inputs, usually sent by the webhook. Drives the
+ * payment-options flyer and the "Est. $X/mo" teaser on the other graphics.
+ */
+export interface Financing {
+  /** Conventional note rate, e.g. 6.375 */
+  ratePct: number;
+  /** Conventional APR (required by Reg Z when advertising payments/rates). */
+  aprPct?: number;
+  /** FHA note rate; defaults to ratePct. */
+  fhaRatePct?: number;
+  fhaAprPct?: number;
+  /** Actual annual property taxes (from MLS). Estimated by state when absent. */
+  annualTaxes?: number;
+  /** Annual homeowners insurance. Estimated by state when absent. */
+  annualInsurance?: number;
+  hoaMonthly?: number;
+}
+
 export interface Listing {
   slug: string;
   loanOfficerSlug: string;
@@ -83,7 +102,8 @@ export interface Listing {
   listingUrl?: string;
   openHouse?: OpenHouse;
   agent: Agent;
-  /** Override the loan officer's payment estimate for this listing. */
+  financing?: Financing;
+  /** Show payment estimates on this listing's materials. */
   showPayment: boolean;
   createdAt: string;
   updatedAt: string;

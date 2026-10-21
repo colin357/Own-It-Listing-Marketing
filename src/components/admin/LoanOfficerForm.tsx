@@ -29,17 +29,21 @@ export function LoanOfficerForm({ slug, initial }: { slug: string | null; initia
       <fieldset>
         <legend>Branding</legend>
         <div className="grid">
-          <Field label="Brand color">
-            <input type="color" name="brandColor" defaultValue={v.brandColor || "#0f2a44"} />
-          </Field>
-          <Field label="Accent color">
-            <input type="color" name="accentColor" defaultValue={v.accentColor || "#c8a24a"} />
-          </Field>
+          <TextInput label="Brand color" name="brandColor" values={v} placeholder="#0a0a0a" hint="Optional hex. Defaults to black." />
+          <TextInput
+            label="Accent color"
+            name="accentColor"
+            values={v}
+            placeholder="#d9d2c5"
+            hint="Optional hex. Graphics default to a neutral stone."
+          />
         </div>
       </fieldset>
       <fieldset>
-        <legend>Estimated payment (optional)</legend>
-        <p className="muted small">Leave the rate blank to hide payment estimates on this loan officer&apos;s materials.</p>
+        <legend>Default rate (optional)</legend>
+        <p className="muted small">
+          Used when a listing comes in without its own rate. Leave blank to only show payments on listings that include one.
+        </p>
         <div className="grid">
           <TextInput label="Rate %" name="paymentRatePct" values={v} inputMode="decimal" placeholder="6.5" />
           <TextInput label="Down payment %" name="paymentDownPct" values={v} inputMode="decimal" placeholder="20" />
