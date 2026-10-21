@@ -1,0 +1,41 @@
+{
+  "slug": "123-maple-ridge-dr-austin-tx",
+  "loanOfficerSlug": "jordan-avery",
+  "status": "just-listed",
+  "address": "123 Maple Ridge Dr",
+  "city": "Austin",
+  "state": "TX",
+  "zip": "78704",
+  "price": 685000,
+  "beds": 4,
+  "baths": 3,
+  "sqft": 2450,
+  "yearBuilt": 2016,
+  "description": "Light-filled modern home on a quiet tree-lined street minutes from South Congress. Open-concept living, chef's kitchen and a backyard made for entertaining.",
+  "highlights": [
+    "Chef's kitchen with quartz counters",
+    "Primary suite with spa bath",
+    "Covered patio & mature trees",
+    "Minutes to SoCo & downtown",
+    "Top-rated school district",
+    "Two-car garage"
+  ],
+  "photos": [
+    "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=1600&q=80&fm=jpg",
+    "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&q=80&fm=jpg",
+    "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=1200&q=80&fm=jpg",
+    "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=1200&q=80&fm=jpg"
+  ],
+  "listingUrl": "https://example.com/listings/123-maple-ridge",
+  "openHouse": { "date": "2026-10-25", "startTime": "1:00 PM", "endTime": "4:00 PM" },
+  "agent": {
+    "name": "Taylor Morgan",
+    "phone": "(512) 555-0199",
+    "email": "taylor@example.com",
+    "brokerage": "Hill Country Realty",
+    "headshotUrl": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&h=400&fit=crop&q=80&fm=jpg"
+  },
+  "showPayment": true,
+  "createdAt": "2026-10-20T15:00:00.000Z",
+  "updatedAt": "2026-10-20T15:00:00.000Z"
+}

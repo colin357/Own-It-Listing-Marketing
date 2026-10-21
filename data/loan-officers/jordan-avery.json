@@ -1,0 +1,17 @@
+{
+  "slug": "jordan-avery",
+  "name": "Jordan Avery",
+  "title": "Senior Loan Officer",
+  "nmls": "1234567",
+  "company": "Own It Home Lending",
+  "companyNmls": "7654321",
+  "phone": "(512) 555-0142",
+  "email": "jordan@example.com",
+  "applyUrl": "https://example.com/apply/jordan-avery",
+  "headshotUrl": "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400&h=400&fit=crop&q=80&fm=jpg",
+  "brandColor": "#0f2a44",
+  "accentColor": "#c8a24a",
+  "payment": { "ratePct": 6.5, "downPaymentPct": 20, "termYears": 30 },
+  "createdAt": "2026-10-01T15:00:00.000Z",
+  "updatedAt": "2026-10-01T15:00:00.000Z"
+}
