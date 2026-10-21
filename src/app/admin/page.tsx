@@ -94,7 +94,7 @@ export default async function AdminHome({ searchParams }: PageProps<"/admin">) {
                     </div>
                   </td>
                   <td>
-                    <span className="pill">{statusLabel(l)}</span>
+                    <span className="tag-status">{statusLabel(l)}</span>
                   </td>
                   <td>{l.agent.name}</td>
                   <td>{loName.get(l.loanOfficerSlug) ?? l.loanOfficerSlug}</td>

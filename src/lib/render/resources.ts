@@ -4,7 +4,7 @@ import path from "node:path";
 import QRCode from "qrcode";
 import sharp from "sharp";
 
-type Font = { name: string; data: Buffer; weight: 400 | 600 | 800 | 700; style: "normal" };
+type Font = { name: string; data: Buffer; weight: 400 | 500 | 600 | 700 | 800 | 900; style: "normal" };
 
 let fontsPromise: Promise<Font[]> | null = null;
 
@@ -12,17 +12,21 @@ export function loadFonts(): Promise<Font[]> {
   fontsPromise ??= (async () => {
     const dir = path.join(process.cwd(), "assets", "fonts");
     const read = (f: string) => fs.readFile(path.join(dir, f));
-    const [regular, semibold, bold, serif] = await Promise.all([
+    const [regular, medium, semibold, extrabold, archivo700, archivo900] = await Promise.all([
       read("Montserrat-Regular.ttf"),
+      read("Montserrat-Medium.ttf"),
       read("Montserrat-SemiBold.ttf"),
       read("Montserrat-Bold.ttf"),
-      read("PlayfairDisplay-Bold.ttf"),
+      read("Archivo-700.ttf"),
+      read("Archivo-900.ttf"),
     ]);
     return [
       { name: "Montserrat", data: regular, weight: 400, style: "normal" },
+      { name: "Montserrat", data: medium, weight: 500, style: "normal" },
       { name: "Montserrat", data: semibold, weight: 600, style: "normal" },
-      { name: "Montserrat", data: bold, weight: 800, style: "normal" },
-      { name: "Playfair", data: serif, weight: 700, style: "normal" },
+      { name: "Montserrat", data: extrabold, weight: 800, style: "normal" },
+      { name: "Archivo", data: archivo700, weight: 700, style: "normal" },
+      { name: "Archivo", data: archivo900, weight: 900, style: "normal" },
     ];
   })();
   return fontsPromise;

@@ -85,12 +85,27 @@ export function complianceLine(lo: LoanOfficer): string {
   return parts.join(" | ");
 }
 
-export const DEFAULT_BRAND = "#0f2a44";
-export const DEFAULT_ACCENT = "#c8a24a";
+// Own It Social house palette. Loan officers can override brand/accent.
+export const INK = "#0a0a0a";
+export const PAPER = "#f4f3f1";
+export const LINE = "#e4e3e0";
+export const DEFAULT_BRAND = INK;
+export const DEFAULT_ACCENT = "#8b3dff";
+
+/** Black or white, whichever reads better on `hex`. */
+export function readableOn(hex: string): string {
+  const n = parseInt(hex.slice(1), 16);
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => {
+    const v = c / 255;
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  });
+  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  // Pick whichever has the higher WCAG contrast ratio.
+  return 1.05 / (lum + 0.05) >= (lum + 0.05) / 0.05 ? "#ffffff" : INK;
+}
 
 export function brandColors(lo: LoanOfficer) {
-  return {
-    brand: lo.brandColor || DEFAULT_BRAND,
-    accent: lo.accentColor || DEFAULT_ACCENT,
-  };
+  const brand = lo.brandColor || DEFAULT_BRAND;
+  const accent = lo.accentColor || DEFAULT_ACCENT;
+  return { brand, accent, onBrand: readableOn(brand), onAccent: readableOn(accent) };
 }

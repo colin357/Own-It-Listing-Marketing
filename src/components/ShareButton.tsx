@@ -19,7 +19,7 @@ export function ShareButton({ url, filename, text }: { url: string; filename: st
   return (
     <button
       type="button"
-      className="btn btn-small btn-ghost"
+      className="textlink"
       disabled={busy}
       onClick={async () => {
         setBusy(true);

@@ -11,7 +11,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <header className="admin-header">
         <div className="container admin-header-inner">
           <Link href="/admin" className="admin-title">
-            Listing Marketing
+            Own It <span>Listing Kits</span>
           </Link>
           <nav>
             <Link href="/admin">Listings</Link>

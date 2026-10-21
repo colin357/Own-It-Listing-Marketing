@@ -20,6 +20,11 @@ https://your-domain.com/l/123-maple-ridge-dr-austin-tx
 | Captions | — | Instagram, Facebook, LinkedIn, text message, email-to-sphere |
 | Download all | .zip | Everything above plus `captions.txt` |
 
+The kit page, admin and graphics all use the Own It Social design language from
+ownitsocial.com: Archivo Black display type, Montserrat body copy, ink/paper/purple
+(`#0A0A0A` / `#F4F3F1` / `#8B3DFF`). A loan officer's brand/accent colors replace the black and
+purple when they're set, and text colors flip automatically to stay readable.
+
 Every asset is co-branded (agent + LO headshots), uses the LO's brand colors, and carries the
 compliance line (LO NMLS, company NMLS, Equal Housing Opportunity, optional custom disclaimer).
 If the LO has payment settings, an **estimated P&I payment** with disclaimer is shown (hidden
@@ -113,7 +118,7 @@ src/lib/render/templates.tsx All graphic templates — edit here to change desig
 src/lib/captions.ts          Caption copy
 src/lib/store.ts             Upstash Redis / local JSON storage
 src/lib/validate.ts          Input normalization for API + forms
-assets/fonts/                Montserrat + Playfair Display (OFL) used in graphics
+assets/fonts/                Archivo + Montserrat (OFL), used by both the pages and the graphics
 data/                        Demo data used when no database is configured
 ```
 
