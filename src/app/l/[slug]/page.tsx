@@ -84,13 +84,6 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
         </div>
       </header>
 
-      <div className="strip">
-        <div className="wrap">
-          Hi {agentFirst}, your listing kit is ready.{" "}
-          <a href={`/l/${l.slug}/download`}>Download everything</a>
-        </div>
-      </div>
-
       <section className="hero">
         {l.photos[0] ? (
           // eslint-disable-next-line @next/next/no-img-element

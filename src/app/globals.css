@@ -70,7 +70,7 @@ code { font-size: 0.88em; background: var(--paper); border: 1px solid var(--line
 .textlink:hover { color: var(--accent); }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 22px; }
 
-/* ---------- kit: nav + strip ---------- */
+/* ---------- kit: nav ---------- */
 .nav { background: var(--white); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 10; }
 .nav-inner { display: flex; align-items: center; gap: 28px; min-height: 72px; }
 .wordmark { font-family: var(--display); font-weight: 900; text-transform: uppercase; letter-spacing: -0.03em; font-size: 1.6rem; line-height: 1; margin-right: auto; }
@@ -78,8 +78,6 @@ code { font-size: 0.88em; background: var(--paper); border: 1px solid var(--line
 .nav-links { display: flex; gap: 26px; }
 .nav-links a { font-family: var(--display); font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.8rem; text-decoration: none; }
 .nav-links a:hover { color: var(--accent); }
-.strip { background: var(--accent); color: var(--on-accent); text-align: center; padding: 10px 0; font-family: var(--display); font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.78rem; }
-.strip a { margin-left: 6px; }
 
 /* ---------- kit: hero ---------- */
 .hero { position: relative; min-height: clamp(560px, 82vh, 820px); display: flex; align-items: flex-end; background: var(--ink); color: var(--white); overflow: hidden; }
@@ -169,7 +167,6 @@ details[open] .row-hint::after { content: " −"; }
 }
 @media (max-width: 420px) {
   .cards { grid-template-columns: 1fr; }
-  .strip { font-size: 0.68rem; }
 }
 
 .landing { padding: 120px var(--gutter); max-width: 760px; }
