@@ -1,0 +1,19 @@
+/* Loan officer "build a kit from an MLS #" page. Shares the kit page's tokens in globals.css. */
+.build-main { padding-top: clamp(48px, 8vw, 96px); padding-bottom: 120px; }
+.build-main > * { max-width: 760px; }
+.build-lead { margin: 18px 0 36px; }
+.build { display: grid; gap: 28px; }
+.build-search { display: grid; gap: 18px; max-width: 520px; }
+.build-search input { font-size: 1.1rem; padding: 14px 16px; }
+.build-note { font-size: 0.92rem; }
+.build-error { color: var(--danger); }
+.build-result { border: 1px solid var(--line); padding: clamp(20px, 4vw, 32px); display: grid; gap: 6px; background: var(--white); }
+.build-address { font-family: var(--display); font-weight: 900; text-transform: uppercase; letter-spacing: -0.01em; font-size: clamp(1.4rem, 3vw, 2rem); line-height: 1.05; margin-top: 4px; }
+.build-facts { display: flex; flex-wrap: wrap; gap: 4px 18px; align-items: baseline; margin: 10px 0 4px; }
+.build-facts strong { font-family: var(--display); font-size: 1.3rem; }
+.build-actions { display: grid; gap: 10px; justify-items: start; margin-top: 18px; }
+.build-recent { margin-top: 72px; }
+.build-recent ul { list-style: none; padding: 0; margin: 14px 0 0; border-top: 1px solid var(--line); }
+.build-recent li { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 2px 16px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.build-recent a { text-decoration: none; }
+.build-recent a:hover strong { text-decoration: underline; }

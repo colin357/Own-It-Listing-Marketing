@@ -71,6 +71,14 @@ http://localhost:3000/admin for the admin. Locally, records are stored as JSON i
 Fill out the form (photos can be uploaded or pasted as URLs). On save you get the share link with a
 **Copy link** button to text/email to the agent.
 
+### Loan officers: build a kit from an MLS # — `/build/<lo>/<token>`
+
+Each loan officer has a private link (copy it from **Admin → Loan officers**). They enter an MLS number, confirm the home, and get a finished kit co-branded with them; existing kits for the same listing are reused.
+
+- MLS numbers are looked up in an index of every listing the detection run pulls (kept 60 days), so a lookup costs no feed request. The feed has no MLS-number search, so a listing that isn't in the index yet (older than the lookback, or outside every metro) is found by street address instead: one RentCast request, capped at 25 per loan officer per day.
+- Photos come from the same Zillow/Apify lookup as detection.
+- Links are an HMAC of the loan officer's slug with `LO_LINK_SECRET` (falls back to `ADMIN_PASSWORD`). Change the secret to revoke every link at once.
+
 ### 2. Automation API (Zapier, Make, CRM webhooks, scripts)
 
 All API calls need `Authorization: Bearer $API_KEY`.

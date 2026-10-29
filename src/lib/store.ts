@@ -3,7 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { Redis } from "@upstash/redis";
 import type { Listing, LoanOfficer } from "./types";
-import type { Detection } from "./detect/types";
+import type { Detection, SourceListing } from "./detect/types";
 
 /**
  * Persistence layer.
@@ -140,4 +140,55 @@ export async function uniqueSlug<T extends { slug: string; createdAt: string }>(
   let slug = base;
   for (let i = 2; await collection.get(slug); i++) slug = `${base}-${i}`;
   return slug;
+}
+
+/**
+ * Every listing a detection run sees, keyed by MLS number, so a loan officer
+ * can build a kit from an MLS # without another feed request. Entries expire
+ * after MLS_INDEX_DAYS. Locally it's one JSON file.
+ */
+const MLS_INDEX_DAYS = 60;
+const MLS_INDEX_FILE = path.join(process.cwd(), "data", "mls-index.json");
+
+async function readMlsFile(): Promise<Record<string, SourceListing>> {
+  try {
+    return JSON.parse(await fs.readFile(MLS_INDEX_FILE, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+export const mlsIndex = {
+  async get(key: string): Promise<SourceListing | null> {
+    if (redis) return (await redis.get<SourceListing>(`mls:${key}`)) ?? null;
+    return (await readMlsFile())[key] ?? null;
+  },
+  async putMany(entries: [key: string, listing: SourceListing][]): Promise<void> {
+    if (!entries.length) return;
+    if (redis) {
+      // Pipelined in chunks so one run of ~20k listings is a few dozen requests.
+      for (let i = 0; i < entries.length; i += 500) {
+        const p = redis.pipeline();
+        for (const [key, l] of entries.slice(i, i + 500)) p.set(`mls:${key}`, l, { ex: MLS_INDEX_DAYS * 86_400 });
+        await p.exec();
+      }
+      return;
+    }
+    if (process.env.VERCEL) return;
+    const all = await readMlsFile();
+    for (const [key, l] of entries) all[key] = l;
+    await fs.mkdir(path.dirname(MLS_INDEX_FILE), { recursive: true });
+    await fs.writeFile(MLS_INDEX_FILE, JSON.stringify(all));
+  },
+};
+
+/** Adds one to today's (UTC) counter for `name` and returns the new count. */
+export async function countToday(name: string): Promise<number> {
+  const key = `count:${name}:${new Date().toISOString().slice(0, 10)}`;
+  if (redis) {
+    const n = await redis.incr(key);
+    if (n === 1) await redis.expire(key, 2 * 86_400);
+    return n;
+  }
+  return 1;
 }
