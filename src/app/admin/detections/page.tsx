@@ -2,7 +2,7 @@ import Link from "next/link";
 import { detections, loanOfficers } from "@/lib/store";
 import { formatPrice } from "@/lib/format";
 import { lastRun, lastTestRun } from "@/lib/detect/run";
-import { getMarketRates } from "@/lib/rates";
+import { currentMarketRates } from "@/lib/rates";
 import { listingProvider, photoSource } from "@/lib/detect/providers";
 import type { DetectionStatus } from "@/lib/detect/types";
 import { approveAction, dismissAction, runNowAction } from "./actions";
@@ -25,7 +25,7 @@ export default async function DetectionsPage({ searchParams }: PageProps<"/admin
     loanOfficers.list(),
     lastRun(),
     lastTestRun(),
-    getMarketRates(),
+    currentMarketRates(),
   ]);
   const rows = all.filter((d) => (status ? d.status === status : d.status !== "dismissed"));
   const count = (s: DetectionStatus) => all.filter((d) => d.status === s).length;
@@ -72,7 +72,7 @@ export default async function DetectionsPage({ searchParams }: PageProps<"/admin
             {rates.fha.aprPct}% APR est.) · VA {rates.va.ratePct}% ({rates.va.aprPct}% APR est.), as of {rates.asOf}
           </strong>
         ) : (
-          <strong>not loaded yet (they refresh on the next run)</strong>
+          <strong>couldn&apos;t be loaded right now (they retry on the next run)</strong>
         )}
         . A loan officer&apos;s own default rate, if set, takes priority.
       </p>
