@@ -45,23 +45,39 @@ export async function sendMail(messages: Mail[]): Promise<string[]> {
   const bcc = (process.env.MAIL_BCC ?? "").split(",").map((s) => s.trim()).filter(Boolean);
   const errors: string[] = [];
   for (const m of messages) {
-    const addr = (a: string) => ({ emailAddress: { address: a } });
-    const res = await fetch(`https://graph.microsoft.com/v1.0/users/${encodeURIComponent(from)}/sendMail`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        message: {
-          subject: m.subject,
-          body: { contentType: "HTML", content: m.html },
-          toRecipients: m.to.map(addr),
-          bccRecipients: bcc.map(addr),
-          replyTo: m.replyTo ? [addr(m.replyTo)] : undefined,
-        },
-        saveToSentItems: true,
-      }),
-      signal: AbortSignal.timeout(20_000),
-    });
-    if (!res.ok) errors.push(`Email to ${m.to.join(", ")} failed (${res.status}): ${(await res.text()).slice(0, 200)}`);
+    // Graph is occasionally slow; one failed or timed-out send must not stop the rest.
+    let error = "";
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        error = await sendOne(token, from, bcc, m);
+      } catch (err) {
+        // A timeout may still have been delivered, so don't resend it.
+        error = `Email to ${m.to.join(", ")} failed: ${(err as Error).message}`;
+        break;
+      }
+      if (!error || !/\((429|50[234])\)/.test(error)) break;
+    }
+    if (error) errors.push(error);
   }
   return errors;
+}
+
+async function sendOne(token: string, from: string, bcc: string[], m: Mail): Promise<string> {
+  const addr = (a: string) => ({ emailAddress: { address: a } });
+  const res = await fetch(`https://graph.microsoft.com/v1.0/users/${encodeURIComponent(from)}/sendMail`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      message: {
+        subject: m.subject,
+        body: { contentType: "HTML", content: m.html },
+        toRecipients: m.to.map(addr),
+        bccRecipients: bcc.map(addr),
+        replyTo: m.replyTo ? [addr(m.replyTo)] : undefined,
+      },
+      saveToSentItems: true,
+    }),
+    signal: AbortSignal.timeout(60_000),
+  });
+  return res.ok ? "" : `Email to ${m.to.join(", ")} failed (${res.status}): ${(await res.text()).slice(0, 200)}`;
 }

@@ -33,8 +33,11 @@ function isScheduledHour(): boolean {
 export async function GET(req: Request) {
   if (!authorized(req)) return unauthorized();
   const sp = new URL(req.url).searchParams;
-  if (req.headers.get("user-agent")?.startsWith("vercel-cron") && !isScheduledHour())
-    return Response.json({ skipped: "Not 7 AM in New York; the other scheduled run handles today." });
+  if (req.headers.get("user-agent")?.startsWith("vercel-cron") && !isScheduledHour()) {
+    // The off-hour run only retries LO emails that didn't go out at 7 AM.
+    const mail = await sendDigests(originFromRequest(req));
+    return Response.json({ skipped: "Not 7 AM in New York; retried unsent LO emails.", emailsSent: mail.sent, errors: mail.errors });
+  }
   // A manual run in the last 20 hours already pulled these listings; skip the
   // feed (and its cost) but still email loan officers anything not yet sent.
   if (req.headers.get("user-agent")?.startsWith("vercel-cron")) {
