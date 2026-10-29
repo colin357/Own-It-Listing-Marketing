@@ -1,7 +1,8 @@
 import { isAuthorizedApiRequest, unauthorized } from "@/lib/auth";
 import { errorResponse } from "@/lib/api";
 import { originFromRequest } from "@/lib/site";
-import { DEFAULT_DAYS, runDetection } from "@/lib/detect/run";
+import { DEFAULT_DAYS, lastRun, runDetection } from "@/lib/detect/run";
+import { sendDigests } from "@/lib/digest";
 
 // Feed requests per metro plus one photo-scrape batch.
 export const maxDuration = 300;
@@ -34,6 +35,15 @@ export async function GET(req: Request) {
   const sp = new URL(req.url).searchParams;
   if (req.headers.get("user-agent")?.startsWith("vercel-cron") && !isScheduledHour())
     return Response.json({ skipped: "Not 7 AM in New York; the other scheduled run handles today." });
+  // A manual run in the last 20 hours already pulled these listings; skip the
+  // feed (and its cost) but still email loan officers anything not yet sent.
+  if (req.headers.get("user-agent")?.startsWith("vercel-cron")) {
+    const last = await lastRun();
+    if (last && Date.now() - Date.parse(last.finishedAt) < 20 * 3_600_000) {
+      const mail = await sendDigests(originFromRequest(req));
+      return Response.json({ skipped: `Listings were pulled at ${last.finishedAt}.`, emailsSent: mail.sent, errors: mail.errors });
+    }
+  }
   const days = Math.min(30, Math.max(1, Number(sp.get("days")) || DEFAULT_DAYS));
   const dryRun = ["1", "true"].includes(sp.get("dryRun") ?? "");
   try {
