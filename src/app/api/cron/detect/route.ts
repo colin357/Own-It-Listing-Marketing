@@ -15,12 +15,25 @@ function authorized(req: Request) {
 }
 
 /**
+ * Vercel Cron runs in UTC, so vercel.json fires at both 11:00 and 12:00 UTC
+ * and only the one that lands at 7 AM in New York does the work. That keeps
+ * the run at 7 AM Eastern through daylight saving changes.
+ */
+function isScheduledHour(): boolean {
+  const hour = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", hour12: false }).format(new Date());
+  return Number(hour) === 7;
+}
+
+/**
  * GET /api/cron/detect[?days=7&dryRun=1] — pull new listings for every metro,
- * match listing agents to the roster and create kits. Runs daily via vercel.json.
+ * match listing agents to the roster, create kits and email each loan officer.
+ * Runs Mondays and Thursdays at 7 AM Eastern via vercel.json.
  */
 export async function GET(req: Request) {
   if (!authorized(req)) return unauthorized();
   const sp = new URL(req.url).searchParams;
+  if (req.headers.get("user-agent")?.startsWith("vercel-cron") && !isScheduledHour())
+    return Response.json({ skipped: "Not 7 AM in New York; the other scheduled run handles today." });
   const days = Math.min(30, Math.max(1, Number(sp.get("days")) || DEFAULT_DAYS));
   const dryRun = ["1", "true"].includes(sp.get("dryRun") ?? "");
   try {

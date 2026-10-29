@@ -8,6 +8,7 @@ import { getMetros, getRoster } from "./roster";
 import { listingProvider, lookupPhotos, photoSource, type PhotoResult } from "./providers";
 import type { Detection, DetectionRun, SourceListing } from "./types";
 import { refreshMarketRates } from "../rates";
+import { sendDigests } from "../digest";
 
 /** Loan officer record for a roster/metro name, matched on first + last name. */
 function loFinder(los: LoanOfficer[]) {
@@ -278,6 +279,18 @@ export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin
     }
   }
 
+  // One email per loan officer with every kit they haven't been sent yet.
+  let emailsSent = 0;
+  if (!dryRun) {
+    try {
+      const mail = await sendDigests(origin);
+      emailsSent = mail.sent;
+      errors.push(...mail.errors);
+    } catch (err) {
+      errors.push(`Emails failed: ${(err as Error).message}`);
+    }
+  }
+
   const run: DetectionRun = {
     startedAt,
     finishedAt: new Date().toISOString(),
@@ -289,6 +302,7 @@ export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin
     matches: results.length,
     created,
     photosAdded,
+    emailsSent,
     review: results.filter((d) => d.status === "review").length,
     waitingLo: results.filter((d) => d.status === "waiting-lo").length,
     errors,

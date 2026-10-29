@@ -95,6 +95,8 @@ export interface Detection {
   listing: SourceListing;
   /** Kit slug once created. */
   listingSlug?: string;
+  /** When the loan officer was emailed this kit. */
+  emailedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -111,6 +113,8 @@ export interface DetectionRun {
   created: number;
   /** Kits that were missing photos and got them on this run. */
   photosAdded: number;
+  /** Loan officers emailed their new kits. */
+  emailsSent?: number;
   review: number;
   waitingLo: number;
   errors: string[];

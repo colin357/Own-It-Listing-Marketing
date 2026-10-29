@@ -139,7 +139,7 @@ Listing slugs are derived from the address and never change once created, so lin
 
 ## New-listing detection
 
-Every Monday and Thursday (`vercel.json` cron, 12:00 UTC) the app looks for new listings by the agents in your
+Every Monday and Thursday at 7 AM Eastern (`vercel.json` fires at 11:00 and 12:00 UTC; the route only runs at 7 AM New York time) the app looks for new listings by the agents in your
 roster and builds their kits automatically, so the loan officer has a finished link the day an agent lists.
 
 1. **Upload the roster** at `/admin/roster`: the agent roster CSV (`full_name`, `brokerage`, `notes` with
@@ -201,3 +201,16 @@ data/                        Demo data used when no database is configured
 Templates include NMLS numbers and Equal Housing Opportunity on every asset, and payment estimates
 carry a disclaimer. Have your compliance team review the templates and the payment disclaimer
 (`src/lib/format.ts`) before going live; LOs can add state-specific text in their profile.
+
+## Loan officer emails
+
+After every real run, each loan officer gets one email listing the kits created for their agents since their last
+email: photo, price, agent, Open kit / Download all links and a message to forward to the agent. Preview and send
+manually at `/admin/emails`. Mail goes out through Microsoft Graph from `MAIL_FROM` (e.g. team@ownitsocial.com):
+
+1. Entra admin center → App registrations → New registration ("Own It Listing Kits"), single tenant.
+2. API permissions → Add → Microsoft Graph → Application permissions → `Mail.Send` → Grant admin consent.
+3. Certificates & secrets → New client secret.
+4. Set `MS_TENANT_ID`, `MS_CLIENT_ID`, `MS_CLIENT_SECRET` and `MAIL_FROM` in Vercel, then redeploy.
+
+Optionally restrict the app to that one mailbox with an Exchange application access policy.
