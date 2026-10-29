@@ -49,7 +49,7 @@ export default async function DetectionsPage({ searchParams }: PageProps<"/admin
       </div>
 
       <p className="muted small">
-        Every morning we pull new listings around each metro, match the listing agent to your{" "}
+        Every Monday and Thursday morning we pull new listings around each metro, match the listing agent to your{" "}
         <Link href="/admin/roster">roster</Link> and build the kit. Confident matches become kits automatically;
         close calls wait here for you.
         {" "}

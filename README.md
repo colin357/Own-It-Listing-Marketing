@@ -139,7 +139,7 @@ Listing slugs are derived from the address and never change once created, so lin
 
 ## New-listing detection
 
-Every morning (`vercel.json` cron, 12:00 UTC) the app looks for new listings by the agents in your
+Every Monday and Thursday (`vercel.json` cron, 12:00 UTC) the app looks for new listings by the agents in your
 roster and builds their kits automatically, so the loan officer has a finished link the day an agent lists.
 
 1. **Upload the roster** at `/admin/roster`: the agent roster CSV (`full_name`, `brokerage`, `notes` with

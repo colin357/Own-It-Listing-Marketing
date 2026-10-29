@@ -47,7 +47,7 @@ export function LoanOfficerForm({ slug, initial }: { slug: string | null; initia
           Show payment estimates and the financing flyers on this loan officer&apos;s kits
         </label>
         <p className="muted small">
-          Rates come from national averages, refreshed every day. To use this loan officer&apos;s own rate instead, enter it
+          Rates come from national averages, refreshed at least every two days. To use this loan officer&apos;s own rate instead, enter it
           below with its APR (Reg Z). Leave blank to use national averages.
         </p>
         <div className="grid">
