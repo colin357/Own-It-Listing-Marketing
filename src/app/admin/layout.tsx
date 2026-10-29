@@ -15,7 +15,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </Link>
           <nav>
             <Link href="/admin">Listings</Link>
+            <Link href="/admin/detections">New listings</Link>
             <Link href="/admin/loan-officers">Loan officers</Link>
+            <Link href="/admin/roster">Roster</Link>
             <Link href="/admin/listings/new" className="btn btn-small">
               + New listing
             </Link>

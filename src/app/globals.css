@@ -245,3 +245,8 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent);
 .tag { font-family: var(--display); font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.62rem; color: var(--accent); }
 .photo-add { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 10px; }
 .upload { display: inline-block; cursor: pointer; }
+
+/* Photo intake for kits created without photos */
+.photos-needed { background: var(--white); border-bottom: 1px solid var(--line); }
+.photo-intake { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin-top: 20px; }
+.photo-intake label { cursor: pointer; }

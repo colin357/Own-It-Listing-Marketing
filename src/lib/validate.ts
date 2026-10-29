@@ -151,6 +151,7 @@ export function parseListingInput(raw: Raw, existing?: Listing): Omit<Listing, "
     agent,
     financing,
     showPayment: bool(raw.showPayment, existing?.showPayment ?? true),
+    source: existing?.source,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };

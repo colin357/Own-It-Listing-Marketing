@@ -7,3 +7,10 @@ out
 *.tsbuildinfo
 next-env.d.ts
 .DS_Store
+
+# Local-only detection data (the real roster lives in the database)
+/data/detections
+/data/roster.json
+/data/metros.json
+/data/detection-run.json
+/data/mock-listings.json

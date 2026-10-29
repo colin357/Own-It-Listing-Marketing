@@ -80,6 +80,17 @@ export interface Financing {
   hoaMonthly?: number;
 }
 
+/** Where an automatically detected listing came from. */
+export interface ListingSource {
+  /** Data provider, e.g. "rentcast". */
+  provider: string;
+  /** The provider's listing id. */
+  id: string;
+  mlsNumber?: string;
+  mlsName?: string;
+  detectedAt: string;
+}
+
 export interface Listing {
   slug: string;
   loanOfficerSlug: string;
@@ -105,6 +116,8 @@ export interface Listing {
   financing?: Financing;
   /** Show payment estimates on this listing's materials. */
   showPayment: boolean;
+  /** Set on listings created by new-listing detection. */
+  source?: ListingSource;
   createdAt: string;
   updatedAt: string;
 }

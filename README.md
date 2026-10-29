@@ -126,8 +126,54 @@ separated `photos`. Statuses like `"Sold"`, `"Pending"`, `"Price Reduced"` are n
 | `GET` / `PUT` / `PATCH` / `DELETE` | `/api/listings/:slug` | `PATCH {"status":"just-sold"}` to flip a kit to Sold |
 | `POST` / `GET` | `/api/loan-officers` | Create / list loan officers |
 | `GET` / `PUT` / `DELETE` | `/api/loan-officers/:slug` | |
+| `GET` / `POST` | `/api/roster?type=agents\|metros` | Read or replace the roster / metros (CSV or JSON body) |
+| `GET` | `/api/detections?status=review` | Detected listings and the last run |
+| `GET` | `/api/cron/detect?dryRun=1&days=2` | Run detection now (also `Authorization: Bearer $CRON_SECRET`) |
 
 Listing slugs are derived from the address and never change once created, so links you've sent stay valid.
+
+## New-listing detection
+
+Every morning (`vercel.json` cron, 12:00 UTC) the app looks for new listings by the agents in your
+roster and builds their kits automatically, so the loan officer has a finished link the day an agent lists.
+
+1. **Upload the roster** at `/admin/roster`: the agent roster CSV (`full_name`, `brokerage`, `notes` with
+   `LO: Name`, …) and the metros CSV (`name`, `city`, `state`, `latitude`, `longitude`, `radius_miles`).
+   Or `POST /api/roster?type=agents|metros` with the CSV as the body.
+2. **Add each loan officer** under Loan officers, with the same name as in the roster. Matches for a
+   loan officer who isn't set up yet wait under "Waiting on LO" and become kits on the next run after
+   they're added.
+3. **Set the environment variables**: `RENTCAST_API_KEY` (listings feed), `APIFY_TOKEN` (photos) and
+   `CRON_SECRET`.
+
+How a run works:
+
+- For each metro, RentCast returns active listings from the last 2 days within the radius (overlapping
+  metros are de-duplicated). Each listing has the listing agent's name, email, phone and brokerage.
+- The listing agent is matched against the roster by name (nicknames like Will/William count), and
+  only against agents whose loan officer works that area. A matching brokerage raises confidence and a
+  different one lowers it.
+- **90%+ matches become kits automatically.** Lower-confidence matches, and names that match agents
+  of two different loan officers, wait under **Admin → New listings** for a person to click
+  "Create kit" or "Not a match".
+- **Photos and description** are scraped from the public Zillow listing (Apify actor
+  `maxcopell~zillow-detail-scraper`, looked up by address), only for matched listings. Zillow can lag
+  the MLS by a day, so kits without photos are retried for a week. Until then the kit page asks the
+  agent to upload their own photos (needs the Blob store), which then fill every graphic.
+- Kits get the status Just Listed, the agent's contact info from the feed, and the loan officer's
+  default rate for payments (no per-listing rate is known).
+- With `DETECTION_WEBHOOK_URL` set, each new kit is POSTed there (`event: "kit.created"`, `kitUrl`,
+  `needsPhotos`, `agent`, `loanOfficer`) so a Zap can text or email the link.
+
+Run it manually from **Admin → New listings** ("Test run" matches without saving anything) or with
+`GET /api/cron/detect?dryRun=1` (API key). `GET /api/detections?status=review` lists the queue.
+
+Expect roughly 25 to 60 RentCast requests a day for 21 metros (one per 500 listings per metro), and one
+Apify actor run per day for the matched homes.
+
+> Scraped photos come from Zillow's public pages, which is against Zillow's terms of use, and listing
+> photos are owned by the photographer or brokerage. The photo source is pluggable
+> (`src/lib/detect/providers`) so it can be swapped for a licensed MLS feed later.
 
 ## Project layout
 
@@ -140,6 +186,7 @@ src/lib/captions.ts          Caption copy
 src/lib/mortgage.ts          PITI scenarios + state tax/insurance estimates
 src/lib/store.ts             Upstash Redis / local JSON storage
 src/lib/validate.ts          Input normalization for API + forms
+src/lib/detect/              New-listing detection: roster, matching, RentCast feed, Zillow photos
 assets/fonts/                Archivo + Montserrat (OFL), used by both the pages and the graphics
 data/                        Demo data used when no database is configured
 ```

@@ -17,6 +17,7 @@ import {
 import { ASSETS, assetsFor, isPrintAsset } from "@/lib/render/templates";
 import { CopyButton } from "@/components/CopyButton";
 import { ShareButton } from "@/components/ShareButton";
+import { AgentPhotoUpload } from "@/components/AgentPhotoUpload";
 
 function assetUrl(slug: string, file: string, version: string, download = false) {
   const v = encodeURIComponent(version);
@@ -128,6 +129,29 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
           </div>
         </div>
       </section>
+
+      {!l.photos.length ? (
+        <section className="intro photos-needed">
+          <div className="wrap intro-inner">
+            <h2 className="display display-md">
+              Add your
+              <br />
+              photos.
+            </h2>
+            <div>
+              <p className="lead">
+                We couldn&apos;t find photos for {streetLine(l)} yet. Add yours and every graphic and the flyer update
+                right away.
+              </p>
+              {process.env.BLOB_READ_WRITE_TOKEN ? (
+                <AgentPhotoUpload slug={l.slug} enabled />
+              ) : (
+                <p className="muted">Reply to {loFirst} with your listing photos and they&apos;ll add them.</p>
+              )}
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <section className="intro">
         <div className="wrap intro-inner">

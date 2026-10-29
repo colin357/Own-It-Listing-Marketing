@@ -3,6 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { Redis } from "@upstash/redis";
 import type { Listing, LoanOfficer } from "./types";
+import type { Detection } from "./detect/types";
 
 /**
  * Persistence layer.
@@ -101,6 +102,35 @@ export const listings: Collection<Listing> = redis
 export const loanOfficers: Collection<LoanOfficer> = redis
   ? redisCollection<LoanOfficer>("lo")
   : fileCollection<LoanOfficer>("loan-officers");
+
+export const detections: Collection<Detection> = redis
+  ? redisCollection<Detection>("detection")
+  : fileCollection<Detection>("detections");
+
+/**
+ * Single JSON documents (the agent roster, metros, last detection run).
+ * Stored as one Redis key each, or data/<name>.json locally.
+ */
+export const documents = {
+  async get<T>(name: string): Promise<T | null> {
+    if (redis) return (await redis.get<T>(`doc:${name}`)) ?? null;
+    try {
+      return JSON.parse(await fs.readFile(path.join(process.cwd(), "data", `${name}.json`), "utf8")) as T;
+    } catch {
+      return null;
+    }
+  },
+  async set<T>(name: string, value: T): Promise<void> {
+    if (redis) {
+      await redis.set(`doc:${name}`, value);
+      return;
+    }
+    if (process.env.VERCEL)
+      throw new Error("No database configured. Add Upstash Redis to this project, then redeploy.");
+    await fs.mkdir(path.join(process.cwd(), "data"), { recursive: true });
+    await fs.writeFile(path.join(process.cwd(), "data", `${name}.json`), JSON.stringify(value, null, 2) + "\n");
+  },
+};
 
 /** Returns `base`, or `base-2`, `base-3`… if taken by a different record. */
 export async function uniqueSlug<T extends { slug: string; createdAt: string }>(
