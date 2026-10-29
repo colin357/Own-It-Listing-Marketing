@@ -8,6 +8,7 @@ import {
   brandColors,
   cityLine,
   complianceLine,
+  firstName,
   formatOpenHouse,
   formatPrice,
   paymentInfo,
@@ -61,7 +62,7 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
   const oh = formatOpenHouse(l);
   const v = assetVersion(l);
   const order = assetsFor(l, lo);
-  const agentFirst = l.agent.name.split(" ")[0];
+  const agentFirst = firstName(l.agent.name) ?? "you";
   const loFirst = lo.name.split(" ")[0];
   const [wordA, wordB] = splitName(lo.name);
   const statusWords = statusLabel(l).toUpperCase().split(" ");

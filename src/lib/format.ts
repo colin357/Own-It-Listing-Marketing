@@ -130,3 +130,12 @@ export function brandColors(lo: LoanOfficer) {
   const accent = lo.accentColor || DEFAULT_ACCENT;
   return { brand, accent, onBrand: readableOn(brand), onAccent: readableOn(accent) };
 }
+
+const TEAM_WORDS = /\b(team|group|realty|homes|properties|partners|associates|collective|llc|inc)\b/i;
+
+/** "Jordan Avery" → "Jordan". null for team or company names ("The Wheaton Group"). */
+export function firstName(name: string): string | null {
+  const words = name.trim().split(/\s+/).filter((w) => w && !/^the$/i.test(w));
+  if (!words.length || TEAM_WORDS.test(name)) return null;
+  return words[0];
+}
