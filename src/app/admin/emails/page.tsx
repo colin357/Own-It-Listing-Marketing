@@ -1,7 +1,7 @@
 import { pendingDigests } from "@/lib/digest";
 import { mailConfigured } from "@/lib/mail";
 import { siteUrl } from "@/lib/site";
-import { sendNowAction } from "./actions";
+import { sendNowAction, sendTestAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -17,11 +17,18 @@ export default async function EmailsPage({ searchParams }: { searchParams: Promi
       {msg ? <div className="alert alert-success">{msg}</div> : null}
       <div className="toolbar">
         <h1>LO emails</h1>
-        <form action={sendNowAction} className="filters">
-          <button className="btn btn-small" disabled={!ready || !digests.length}>
-            Send now
-          </button>
-        </form>
+        <div className="filters">
+          <form action={sendTestAction}>
+            <button className="btn btn-small btn-ghost" disabled={!ready || !digests.length}>
+              Send test to {ready ? process.env.MAIL_FROM : "me"}
+            </button>
+          </form>
+          <form action={sendNowAction}>
+            <button className="btn btn-small" disabled={!ready || !digests.length}>
+              Send to all LOs now
+            </button>
+          </form>
+        </div>
       </div>
       <p className="muted small">
         After each Monday and Thursday run, every loan officer gets one email with the kits created for their agents since
