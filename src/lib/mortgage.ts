@@ -46,6 +46,22 @@ const FHA_ANNUAL_MIP_PCT = 0.55;
 /** FHA annual MIP above the high-balance threshold. */
 const FHA_ANNUAL_MIP_HIGH_PCT = 0.75;
 const FHA_HIGH_BALANCE = 726_200;
+/** VA funding fee, first use, under 5% down. Financed into the loan; no monthly mortgage insurance. */
+const VA_FUNDING_FEE_PCT = 2.15;
+/** Buyer closing costs + prepaids, as % of price, for "cash to close" estimates. */
+const CLOSING_COST_PCT = 3;
+
+/**
+ * Qualification rules of thumb per program, used for the "what it takes"
+ * flyer. Debt-to-income is the guideline most borrowers are approved at, not
+ * the absolute maximum an automated approval may allow.
+ */
+export const GUIDELINES: Record<string, { minCredit: number; maxDti: number; bestFor: string }> = {
+  "conv-low": { minCredit: 620, maxDti: 45, bestFor: "Good credit and some savings" },
+  "conv-20": { minCredit: 620, maxDti: 45, bestFor: "No mortgage insurance, lowest payment" },
+  fha: { minCredit: 580, maxDti: 43, bestFor: "Lower credit scores and smaller savings" },
+  va: { minCredit: 620, maxDti: 41, bestFor: "Eligible veterans and service members" },
+};
 
 export interface Scenario {
   id: string;
@@ -63,6 +79,8 @@ export interface Scenario {
   miLabel: string;
   hoa: number;
   total: number;
+  /** Estimated down payment plus closing costs. */
+  cashToClose: number;
 }
 
 export interface PaymentOptions {
@@ -89,83 +107,191 @@ export function estimateAnnualInsurance(price: number, state: string): number {
   return (per300k * price * DWELLING_SHARE) / 300_000;
 }
 
-/** Returns the three PITI scenarios, or null when there's no rate or payments are hidden. */
-export function paymentOptions(l: Listing, lo: LoanOfficer): PaymentOptions | null {
+interface Inputs {
+  price: number;
+  ratePct: number;
+  aprPct?: number;
+  fhaRatePct: number;
+  fhaAprPct?: number;
+  vaRatePct: number;
+  vaAprPct?: number;
+  taxes: number;
+  insurance: number;
+  hoa: number;
+}
+
+function inputs(l: Listing, lo: LoanOfficer) {
   const f = l.financing;
   const ratePct = f?.ratePct ?? lo.payment?.ratePct;
   if (ratePct == null || !l.showPayment) return null;
-
-  const fhaRatePct = f?.fhaRatePct ?? ratePct;
+  const fromListing = f?.ratePct != null;
   const annualTaxes = f?.annualTaxes ?? estimateAnnualTaxes(l.price, l.state);
   const annualInsurance = f?.annualInsurance ?? estimateAnnualInsurance(l.price, l.state);
-  const taxes = annualTaxes / 12;
-  const insurance = annualInsurance / 12;
-  const hoa = f?.hoaMonthly ?? 0;
-
-  const conventional = (id: string, downPct: number): Scenario => {
-    const downPayment = l.price * (downPct / 100);
-    const loanAmount = l.price - downPayment;
-    const principalInterest = principalAndInterest(loanAmount, ratePct);
-    const mortgageInsurance = downPct < 20 ? (loanAmount * CONV_PMI_PCT) / 100 / 12 : 0;
-    return {
-      id,
-      name: "Conventional",
-      detail: `${downPct}% down`,
-      downPct,
-      downPayment,
-      loanAmount,
-      ratePct,
-      aprPct: f?.aprPct,
-      principalInterest,
-      taxes,
-      insurance,
-      mortgageInsurance,
-      miLabel: "PMI",
-      hoa,
-      total: principalInterest + taxes + insurance + mortgageInsurance + hoa,
-    };
+  // The loan officer's default rate carries its own APR.
+  const aprPct = fromListing ? f?.aprPct : lo.payment?.aprPct;
+  // A program without its own rate borrows the next one's rate, and its APR with it,
+  // so a rate is never shown without an APR (Reg Z).
+  const fhaRatePct = f?.fhaRatePct ?? ratePct;
+  const fhaAprPct = f?.fhaRatePct != null ? f.fhaAprPct : aprPct;
+  const i: Inputs = {
+    price: l.price,
+    ratePct,
+    aprPct,
+    fhaRatePct,
+    fhaAprPct,
+    vaRatePct: f?.vaRatePct ?? fhaRatePct,
+    vaAprPct: f?.vaRatePct != null ? f.vaAprPct : fhaAprPct,
+    taxes: annualTaxes / 12,
+    insurance: annualInsurance / 12,
+    hoa: f?.hoaMonthly ?? 0,
   };
+  return { i, annualTaxes, annualInsurance, taxesEstimated: f?.annualTaxes == null, insuranceEstimated: f?.annualInsurance == null };
+}
 
-  const fha = (): Scenario => {
-    const downPct = 3.5;
-    const downPayment = l.price * (downPct / 100);
-    const baseLoan = l.price - downPayment;
-    const loanAmount = baseLoan * (1 + FHA_UFMIP_PCT / 100);
-    const principalInterest = principalAndInterest(loanAmount, fhaRatePct);
-    const mipPct = baseLoan > FHA_HIGH_BALANCE ? FHA_ANNUAL_MIP_HIGH_PCT : FHA_ANNUAL_MIP_PCT;
-    const mortgageInsurance = (baseLoan * mipPct) / 100 / 12;
-    return {
-      id: "fha",
-      name: "FHA",
-      detail: "3.5% down",
-      downPct,
-      downPayment,
-      loanAmount,
-      ratePct: fhaRatePct,
-      aprPct: f?.fhaAprPct,
-      principalInterest,
-      taxes,
-      insurance,
-      mortgageInsurance,
-      miLabel: "MIP",
-      hoa,
-      total: principalInterest + taxes + insurance + mortgageInsurance + hoa,
-    };
+function conventional(i: Inputs, id: string, downPct: number): Scenario {
+  const downPayment = i.price * (downPct / 100);
+  const loanAmount = i.price - downPayment;
+  const principalInterest = principalAndInterest(loanAmount, i.ratePct);
+  const mortgageInsurance = downPct < 20 ? (loanAmount * CONV_PMI_PCT) / 100 / 12 : 0;
+  return {
+    id,
+    name: "Conventional",
+    detail: `${downPct}% down`,
+    downPct,
+    downPayment,
+    loanAmount,
+    ratePct: i.ratePct,
+    aprPct: i.aprPct,
+    principalInterest,
+    taxes: i.taxes,
+    insurance: i.insurance,
+    mortgageInsurance,
+    miLabel: "PMI",
+    hoa: i.hoa,
+    total: principalInterest + i.taxes + i.insurance + mortgageInsurance + i.hoa,
+    cashToClose: downPayment + (i.price * CLOSING_COST_PCT) / 100,
   };
+}
 
-  const scenarios = [conventional("conv-low", 5), conventional("conv-20", 20), fha()];
-  const taxesEstimated = f?.annualTaxes == null;
-  const insuranceEstimated = f?.annualInsurance == null;
+function fha(i: Inputs): Scenario {
+  const downPct = 3.5;
+  const downPayment = i.price * (downPct / 100);
+  const baseLoan = i.price - downPayment;
+  const loanAmount = baseLoan * (1 + FHA_UFMIP_PCT / 100);
+  const principalInterest = principalAndInterest(loanAmount, i.fhaRatePct);
+  const mipPct = baseLoan > FHA_HIGH_BALANCE ? FHA_ANNUAL_MIP_HIGH_PCT : FHA_ANNUAL_MIP_PCT;
+  const mortgageInsurance = (baseLoan * mipPct) / 100 / 12;
+  return {
+    id: "fha",
+    name: "FHA",
+    detail: "3.5% down",
+    downPct,
+    downPayment,
+    loanAmount,
+    ratePct: i.fhaRatePct,
+    aprPct: i.fhaAprPct,
+    principalInterest,
+    taxes: i.taxes,
+    insurance: i.insurance,
+    mortgageInsurance,
+    miLabel: "MIP",
+    hoa: i.hoa,
+    total: principalInterest + i.taxes + i.insurance + mortgageInsurance + i.hoa,
+    cashToClose: downPayment + (i.price * CLOSING_COST_PCT) / 100,
+  };
+}
 
+function va(i: Inputs): Scenario {
+  const loanAmount = i.price * (1 + VA_FUNDING_FEE_PCT / 100);
+  const principalInterest = principalAndInterest(loanAmount, i.vaRatePct);
+  return {
+    id: "va",
+    name: "VA",
+    detail: "0% down",
+    downPct: 0,
+    downPayment: 0,
+    loanAmount,
+    ratePct: i.vaRatePct,
+    aprPct: i.vaAprPct,
+    principalInterest,
+    taxes: i.taxes,
+    insurance: i.insurance,
+    mortgageInsurance: 0,
+    miLabel: "None",
+    hoa: i.hoa,
+    total: principalInterest + i.taxes + i.insurance + i.hoa,
+    cashToClose: (i.price * CLOSING_COST_PCT) / 100,
+  };
+}
+
+function buildDisclaimer(
+  l: Listing,
+  scenarios: Scenario[],
+  x: NonNullable<ReturnType<typeof inputs>>,
+  extra: string[] = [],
+): string {
   const rateText = scenarios
-    .map((s) => `${s.name} ${s.detail}: ${s.ratePct}% rate${s.aprPct ? ` (${s.aprPct}% APR)` : ""}, ${formatPrice(s.downPayment)} down, ${formatPrice(s.loanAmount)} loan`)
+    .map((s) => `${s.name} ${s.detail}: ${s.ratePct}% rate${s.aprPct ? ` (${s.aprPct}% APR)` : ""}, ${formatPrice(s.downPayment)} down, ${formatPrice(Math.round(s.loanAmount))} loan`)
     .join("; ");
-  const disclaimer = [
+  const hasFha = scenarios.some((s) => s.id === "fha");
+  const hasVa = scenarios.some((s) => s.id === "va");
+  return [
     `Payments are estimates for illustration only, based on a ${formatPrice(l.price)} purchase price and ${TERM_YEARS}-year fixed terms. ${rateText}.`,
-    `Payments include principal, interest, ${taxesEstimated ? "estimated " : ""}property taxes of ${formatPrice(annualTaxes)}/yr, ${insuranceEstimated ? "estimated " : ""}homeowners insurance of ${formatPrice(annualInsurance)}/yr${hoa ? `, HOA dues of ${formatPrice(hoa)}/mo` : ""} and mortgage insurance where applicable.`,
-    `FHA includes a ${FHA_UFMIP_PCT}% upfront MIP financed into the loan and annual MIP; FHA loans are subject to county loan limits.`,
+    `Payments include principal, interest, ${x.taxesEstimated ? "estimated " : ""}property taxes of ${formatPrice(Math.round(x.annualTaxes))}/yr, ${x.insuranceEstimated ? "estimated " : ""}homeowners insurance of ${formatPrice(Math.round(x.annualInsurance))}/yr${x.i.hoa ? `, HOA dues of ${formatPrice(x.i.hoa)}/mo` : ""} and mortgage insurance where applicable.`,
+    hasFha ? `FHA includes a ${FHA_UFMIP_PCT}% upfront MIP financed into the loan and annual MIP; FHA loans are subject to county loan limits.` : "",
+    hasVa ? `VA assumes first-time use with the ${VA_FUNDING_FEE_PCT}% funding fee financed; eligibility required.` : "",
+    ...extra,
     `Actual rates, payments and mortgage insurance vary based on credit, loan amount, occupancy and other factors. Rates subject to change without notice. Not a commitment to lend. Subject to credit approval.`,
-  ].join(" ");
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
 
-  return { scenarios, annualTaxes, annualInsurance, taxesEstimated, insuranceEstimated, disclaimer };
+/** Returns the three PITI scenarios, or null when there's no rate or payments are hidden. */
+export function paymentOptions(l: Listing, lo: LoanOfficer): PaymentOptions | null {
+  const x = inputs(l, lo);
+  if (!x) return null;
+  const scenarios = [conventional(x.i, "conv-low", 5), conventional(x.i, "conv-20", 20), fha(x.i)];
+  return {
+    scenarios,
+    annualTaxes: x.annualTaxes,
+    annualInsurance: x.annualInsurance,
+    taxesEstimated: x.taxesEstimated,
+    insuranceEstimated: x.insuranceEstimated,
+    disclaimer: buildDisclaimer(l, scenarios, x),
+  };
+}
+
+export interface Program extends Scenario {
+  minCredit: number;
+  maxDti: number;
+  bestFor: string;
+  /** Gross household income needed at the guideline DTI, with no other debts. */
+  incomeNeeded: number;
+}
+
+export interface ProgramOptions extends PaymentOptions {
+  scenarios: Program[];
+  /** Extra yearly income needed for every $500/mo of other debts (car, cards, student loans). */
+  incomePer500Debt: number;
+}
+
+/** Four loan programs (incl. VA) with cash to close and qualification rules of thumb. */
+export function programOptions(l: Listing, lo: LoanOfficer): ProgramOptions | null {
+  const x = inputs(l, lo);
+  if (!x) return null;
+  const scenarios: Program[] = [conventional(x.i, "conv-low", 5), conventional(x.i, "conv-20", 20), fha(x.i), va(x.i)].map((s) => {
+    const g = GUIDELINES[s.id];
+    return { ...s, ...g, incomeNeeded: (s.total * 12) / (g.maxDti / 100) };
+  });
+  const dtiNote = `Income needed is gross household income at a debt-to-income ratio of ${scenarios.map((s) => `${s.maxDti}% (${s.name} ${s.detail})`).join(", ")}, assuming no other monthly debts. Credit scores are typical minimums; requirements vary by lender and borrower. Cash to close includes the down payment and estimated closing costs and prepaids of ${CLOSING_COST_PCT}% of the price.`;
+  return {
+    scenarios,
+    annualTaxes: x.annualTaxes,
+    annualInsurance: x.annualInsurance,
+    taxesEstimated: x.taxesEstimated,
+    insuranceEstimated: x.insuranceEstimated,
+    incomePer500Debt: (500 * 12) / (GUIDELINES["conv-low"].maxDti / 100),
+    disclaimer: buildDisclaimer(l, scenarios, x, [dtiNote]),
+  };
 }

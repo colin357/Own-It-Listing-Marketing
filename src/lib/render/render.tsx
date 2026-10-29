@@ -2,7 +2,7 @@ import "server-only";
 import { ImageResponse } from "next/og";
 import type { Listing, LoanOfficer } from "../types";
 import { graphicColors } from "../format";
-import { paymentOptions } from "../mortgage";
+import { paymentOptions, programOptions } from "../mortgage";
 import { inlineImage, loadFonts, qrDataUrl } from "./resources";
 import { ASSETS, type AssetName, type RenderData } from "./templates";
 
@@ -29,6 +29,7 @@ async function buildRenderData(listing: Listing, lo: LoanOfficer): Promise<Rende
     listingQr,
     ...colors,
     payments: paymentOptions(listing, lo),
+    programs: programOptions(listing, lo),
   };
 }
 

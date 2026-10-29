@@ -81,7 +81,7 @@ export function paymentInfo(l: Listing, lo: LoanOfficer) {
     termYears: lo.payment?.termYears ?? 30,
   };
   const monthly = monthlyPayment(l.price, settings);
-  const apr = l.financing?.ratePct != null ? l.financing.aprPct : undefined;
+  const apr = l.financing?.ratePct != null ? l.financing.aprPct : lo.payment?.aprPct;
   return {
     monthly,
     label: `${formatPrice(monthly)}/mo*`,

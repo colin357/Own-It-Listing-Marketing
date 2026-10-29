@@ -1,13 +1,14 @@
 import { zipSync, strToU8 } from "fflate";
 import { getKit } from "@/lib/listings";
 import { buildCaptions } from "@/lib/captions";
+import { buildEmails } from "@/lib/emails";
 import { assetFilename, renderAssets } from "@/lib/render/render";
 import { pngToLetterPdf } from "@/lib/render/pdf";
 import { ASSETS, assetsFor, isPrintAsset } from "@/lib/render/templates";
 
 export const maxDuration = 60;
 
-/** Everything in one ZIP: all PNGs, the flyer PDFs and a captions.txt. */
+/** Everything in one ZIP: all PNGs, the flyer PDFs, captions.txt and emails.txt. */
 export async function GET(_req: Request, ctx: RouteContext<"/l/[slug]/download">) {
   const { slug } = await ctx.params;
   const kit = await getKit(slug);
@@ -28,6 +29,10 @@ export async function GET(_req: Request, ctx: RouteContext<"/l/[slug]/download">
     .map((c) => `===== ${c.label.toUpperCase()} =====\n\n${c.text}\n`)
     .join("\n");
   files["captions.txt"] = strToU8(captions);
+  const emails = buildEmails(listing, lo)
+    .map((e) => `===== ${e.label.toUpperCase()} (${e.audience}) =====\n\nSubject: ${e.subject}\n\n${e.body}\n`)
+    .join("\n");
+  files["emails.txt"] = strToU8(emails);
 
   // PNG/PDF are already compressed; store them as-is for speed.
   const zip = zipSync(files, { level: 0 });

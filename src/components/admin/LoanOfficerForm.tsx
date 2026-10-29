@@ -42,10 +42,11 @@ export function LoanOfficerForm({ slug, initial }: { slug: string | null; initia
       <fieldset>
         <legend>Default rate (optional)</legend>
         <p className="muted small">
-          Used when a listing comes in without its own rate. Leave blank to only show payments on listings that include one.
+          Used when a listing comes in without its own rate. Leave blank to only show payments on listings that include one. Always include the APR with a rate (Reg Z).
         </p>
         <div className="grid">
           <TextInput label="Rate %" name="paymentRatePct" values={v} inputMode="decimal" placeholder="6.5" />
+          <TextInput label="APR %" name="paymentAprPct" values={v} inputMode="decimal" placeholder="6.62" />
           <TextInput label="Down payment %" name="paymentDownPct" values={v} inputMode="decimal" placeholder="20" />
           <TextInput label="Term (years)" name="paymentTermYears" values={v} inputMode="numeric" placeholder="30" />
         </div>

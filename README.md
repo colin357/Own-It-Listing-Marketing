@@ -19,7 +19,10 @@ https://your-domain.com/l/123-maple-ridge-dr-austin-tx
 | Flyer | 8.5×11 PNG + PDF | Print, with QR codes to the listing and LO's pre-approval link |
 | Payment options flyer | 8.5×11 PNG + PDF | Three PITI scenarios: Conventional 5% down, Conventional 20% down, FHA 3.5% down (needs a rate) |
 | Captions | — | Instagram, Facebook, LinkedIn, text message, email-to-sphere |
-| Download all | .zip | Everything above plus `captions.txt` |
+| Ways to buy flyer | 8.5×11 PNG + PDF | Conventional 5%, Conventional 20%, FHA 3.5% and VA 0%: payment, down payment, cash to close, typical credit (needs a rate) |
+| What it takes flyer | 8.5×11 PNG + PDF | Down payment, credit and income needed per program, plus next steps (needs a rate) |
+| Emails | Kit page + `emails.txt` | Copy-and-paste emails in the agent's voice: announcement, neighbors, agents, open house/showing, financing spotlight, buyer inquiry |
+| Download all | .zip | Everything above plus `captions.txt` and `emails.txt` |
 
 The kit page and admin use the Own It Social design language from ownitsocial.com: Archivo Black
 display type, Montserrat body copy, ink/paper/purple (`#0A0A0A` / `#F4F3F1` / `#8B3DFF`). The
@@ -102,6 +105,8 @@ Send the rate with the listing to unlock the payment-options flyer and the "Est.
 | `apr` | `aprPct` | Conventional APR. **Send this** — Reg Z requires APR when ads state a rate or payment |
 | `fhaRate` | `fhaRatePct` | FHA note rate (defaults to `rate`) |
 | `fhaApr` | `fhaAprPct` | FHA APR |
+| `vaRate` | `vaRatePct` | VA note rate (defaults to the FHA rate) |
+| `vaApr` | `vaAprPct` | VA APR |
 | `annualTaxes` | `taxes` | Actual annual property taxes (from MLS). Otherwise estimated by state |
 | `annualInsurance` | `insurance` | Annual homeowners insurance. Otherwise estimated by state |
 | `hoaMonthly` | `hoa` | Added to every scenario |
@@ -138,7 +143,7 @@ Every morning (`vercel.json` cron, 12:00 UTC) the app looks for new listings by 
 roster and builds their kits automatically, so the loan officer has a finished link the day an agent lists.
 
 1. **Upload the roster** at `/admin/roster`: the agent roster CSV (`full_name`, `brokerage`, `notes` with
-   `LO: Name`, …) and the metros CSV (`name`, `city`, `state`, `latitude`, `longitude`, `radius_miles`).
+   `LO: Name`, optional `headshot_url`, …) and the metros CSV (`name`, `city`, `state`, `latitude`, `longitude`, `radius_miles`).
    Or `POST /api/roster?type=agents|metros` with the CSV as the body.
 2. **Add each loan officer** under Loan officers, with the same name as in the roster. Matches for a
    loan officer who isn't set up yet wait under "Waiting on LO" and become kits on the next run after

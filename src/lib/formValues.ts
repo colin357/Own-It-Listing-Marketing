@@ -58,6 +58,7 @@ export function loanOfficerToValues(lo: LoanOfficer): Record<string, string> {
     accentColor: s(lo.accentColor),
     disclaimer: s(lo.disclaimer),
     paymentRatePct: s(lo.payment?.ratePct),
+    paymentAprPct: s(lo.payment?.aprPct),
     paymentDownPct: s(lo.payment?.downPaymentPct),
     paymentTermYears: s(lo.payment?.termYears),
   };

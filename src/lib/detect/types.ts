@@ -29,6 +29,8 @@ export interface RosterAgent {
   zip?: string;
   phone?: string;
   email?: string;
+  /** Photo of the agent, used on the co-branded graphics. */
+  headshotUrl?: string;
   notes?: string;
 }
 

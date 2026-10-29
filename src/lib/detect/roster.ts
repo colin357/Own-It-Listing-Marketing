@@ -88,7 +88,7 @@ export function parseMetros(rows: Record<string, unknown>[]): Metro[] {
 
 /**
  * Accepts roster.csv rows (full_name, city, state, zip_code, brokerage,
- * phone, email, notes). The loan officer comes from a `loan_officer` column,
+ * phone, email, headshot_url, notes). The loan officer comes from a `loan_officer` column,
  * or from "LO: <name>" inside notes.
  */
 export function parseRoster(rows: Record<string, unknown>[]): RosterAgent[] {
@@ -109,6 +109,7 @@ export function parseRoster(rows: Record<string, unknown>[]): RosterAgent[] {
       zip: first(row, "zip_code", "zip", "zipCode"),
       phone: first(row, "phone"),
       email: first(row, "email"),
+      headshotUrl: first(row, "headshot_url", "headshot", "photo_url", "headshotUrl"),
       notes,
     };
   });

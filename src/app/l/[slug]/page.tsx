@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import { notFound } from "next/navigation";
 import { getKit } from "@/lib/listings";
 import { buildCaptions } from "@/lib/captions";
+import { buildEmails } from "@/lib/emails";
 import {
   brandColors,
   cityLine,
@@ -14,7 +15,7 @@ import {
   statusLabel,
   streetLine,
 } from "@/lib/format";
-import { ASSETS, assetsFor, isPrintAsset } from "@/lib/render/templates";
+import { ASSETS, assetsFor, isPrintAsset, TEMPLATE_VERSION } from "@/lib/render/templates";
 import { CopyButton } from "@/components/CopyButton";
 import { ShareButton } from "@/components/ShareButton";
 import { AgentPhotoUpload } from "@/components/AgentPhotoUpload";
@@ -32,7 +33,7 @@ export async function generateMetadata({ params }: PageProps<"/l/[slug]">): Prom
   const { listing: l, lo } = kit;
   const title = `${statusLabel(l)}: ${streetLine(l)} – Marketing Kit`;
   const description = `Co-branded social posts, flyers and captions for ${streetLine(l)}, ${l.city}. Courtesy of ${lo.name}, ${lo.company}.`;
-  const image = assetUrl(l.slug, "landscape.png", l.updatedAt);
+  const image = assetUrl(l.slug, "landscape.png", `${TEMPLATE_VERSION}-${l.updatedAt}`);
   return {
     title,
     description,
@@ -55,9 +56,10 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
   const { listing: l, lo } = kit;
   const { accent, onAccent } = brandColors(lo);
   const captions = buildCaptions(l, lo);
+  const emails = buildEmails(l, lo);
   const pay = paymentInfo(l, lo);
   const oh = formatOpenHouse(l);
-  const v = l.updatedAt;
+  const v = `${TEMPLATE_VERSION}-${l.updatedAt}`;
   const order = assetsFor(l, lo);
   const agentFirst = l.agent.name.split(" ")[0];
   const loFirst = lo.name.split(" ")[0];
@@ -78,6 +80,7 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
           <nav className="nav-links">
             <a href="#graphics">Graphics</a>
             <a href="#captions">Captions</a>
+            <a href="#emails">Emails</a>
             <a href="#contact">Contact</a>
           </nav>
           <a className="pill" href={`/l/${l.slug}/download`}>
@@ -256,6 +259,47 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
         </div>
       </section>
 
+      <section className="mail" id="emails">
+        <div className="wrap dark-inner">
+          <div className="dark-intro">
+            <p className="eyebrow">Your inbox</p>
+            <h2 className="display display-md">
+              Emails,
+              <br />
+              ready
+              <br />
+              to send.
+            </h2>
+            <p className="lead">
+              Copy the subject and the email into Gmail, Outlook or your CRM. Fill in anything in [brackets] before you send.
+            </p>
+          </div>
+          <div className="rows">
+            {emails.map((e) => (
+              <div key={e.id} className="row">
+                <details>
+                  <summary>
+                    <span>
+                      <span className="row-name">{e.label}</span>
+                      <span className="row-sub">{e.audience}</span>
+                    </span>
+                    <span className="row-hint">Preview</span>
+                  </summary>
+                  <p className="row-subject">
+                    <strong>Subject:</strong> {e.subject}
+                  </p>
+                  <pre className="row-text">{e.body}</pre>
+                </details>
+                <div className="row-actions">
+                  <CopyButton text={e.subject} label="Copy subject" className="pill pill-ghost" />
+                  <CopyButton text={e.body} label="Copy email" className="pill" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section className="partner" id="contact">
         <div className="wrap">
           <div className="partner-card">
@@ -320,6 +364,7 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
             <div className="foot-cols">
               <a href="#graphics">Graphics</a>
               <a href="#captions">Captions</a>
+              <a href="#emails">Emails</a>
               <a href={`/l/${l.slug}/download`}>Download all</a>
               {lo.applyUrl ? (
                 <a href={lo.applyUrl} target="_blank" rel="noreferrer">

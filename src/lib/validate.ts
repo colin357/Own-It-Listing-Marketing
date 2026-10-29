@@ -115,11 +115,13 @@ export function parseListingInput(raw: Raw, existing?: Listing): Omit<Listing, "
       aprPct: num(pick(raw, "apr", "aprPct", "financing.aprPct")),
       fhaRatePct: num(pick(raw, "fhaRate", "fhaRatePct", "financing.fhaRatePct")),
       fhaAprPct: num(pick(raw, "fhaApr", "fhaAprPct", "financing.fhaAprPct")),
+      vaRatePct: num(pick(raw, "vaRate", "vaRatePct", "financing.vaRatePct")),
+      vaAprPct: num(pick(raw, "vaApr", "vaAprPct", "financing.vaAprPct")),
       annualTaxes: num(pick(raw, "annualTaxes", "taxes", "financing.annualTaxes")),
       annualInsurance: num(pick(raw, "annualInsurance", "insurance", "financing.annualInsurance")),
       hoaMonthly: num(pick(raw, "hoaMonthly", "hoa", "financing.hoaMonthly")),
     };
-    const bad = (["ratePct", "aprPct", "fhaRatePct", "fhaAprPct"] as const).filter((k) => {
+    const bad = (["ratePct", "aprPct", "fhaRatePct", "fhaAprPct", "vaRatePct", "vaAprPct"] as const).filter((k) => {
       const v = financing![k];
       return v != null && (v <= 0 || v > 20);
     });
@@ -179,6 +181,7 @@ export function parseLoanOfficerInput(raw: Raw, existing?: LoanOfficer): LoanOff
   if (ratePct != null) {
     payment = {
       ratePct,
+      aprPct: num(pick(raw, "paymentAprPct", "payment.aprPct")),
       downPaymentPct: num(pick(raw, "paymentDownPct", "payment.downPaymentPct")) ?? 20,
       termYears: num(pick(raw, "paymentTermYears", "payment.termYears")) ?? 30,
     };

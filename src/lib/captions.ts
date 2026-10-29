@@ -131,35 +131,10 @@ export function buildCaptions(l: Listing, lo: LoanOfficer): Caption[] {
     .filter(Boolean)
     .join(" ");
 
-  const email = [
-    `Subject: ${headline.replace(/^\S+\s/, "")} — ${streetLine(l)}, ${l.city}`,
-    "",
-    "Hi there,",
-    "",
-    l.status === "just-sold"
-      ? `I'm excited to share that ${fullAddress(l)} is officially SOLD!`
-      : `I'm excited to share my new listing at ${fullAddress(l)}, offered at ${formatPrice(l.price)}.`,
-    stats ? `\n${stats}` : null,
-    l.description ? `\n${l.description}` : null,
-    highlights ? `\nHighlights:\n${l.highlights.slice(0, 6).map((h) => `• ${h}`).join("\n")}` : null,
-    oh ? `\nOpen House: ${oh}` : null,
-    fin
-      ? `\nThinking about financing? My lending partner ${lo.name} (NMLS #${lo.nmls}) at ${lo.company} can help you get pre-approved${lo.phone ? ` — ${lo.phone}` : ""}${lo.applyUrl ? ` or ${lo.applyUrl}` : ""}.`
-      : null,
-    pay ? `\n${pay.disclaimer}` : null,
-    "",
-    "Best,",
-    l.agent.name,
-    [l.agent.brokerage, l.agent.phone, l.agent.email].filter(Boolean).join(" | "),
-  ]
-    .filter((x) => x != null)
-    .join("\n");
-
   return [
     { id: "instagram", label: "Instagram", text: instagram },
     { id: "facebook", label: "Facebook", text: facebook },
     { id: "linkedin", label: "LinkedIn", text: linkedin },
     { id: "text", label: "Text message", text },
-    { id: "email", label: "Email to sphere", text: email },
   ].map((c) => ({ ...c, text: c.text.replace(/\n{3,}/g, "\n\n").trim() }));
 }

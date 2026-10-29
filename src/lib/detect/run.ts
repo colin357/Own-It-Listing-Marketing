@@ -60,6 +60,7 @@ export async function createKitFromDetection(det: Detection, lo: LoanOfficer): P
       phone: s.agent.phone ?? det.rosterAgent.phone,
       email: s.agent.email ?? det.rosterAgent.email,
       brokerage: s.office?.name ?? det.rosterAgent.brokerage,
+      headshotUrl: det.rosterAgent.headshotUrl,
     },
     listingUrl: s.listingUrl,
   });

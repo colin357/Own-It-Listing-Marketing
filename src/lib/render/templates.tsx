@@ -14,7 +14,7 @@ import {
   statusLabel,
   streetLine,
 } from "../format";
-import { paymentOptions, type PaymentOptions } from "../mortgage";
+import { paymentOptions, type PaymentOptions, type ProgramOptions } from "../mortgage";
 
 /**
  * Satori templates (rendered to PNG by next/og). Satori supports a subset of
@@ -24,7 +24,13 @@ import { paymentOptions, type PaymentOptions } from "../mortgage";
  * Visual language follows ownitsocial.com: Archivo Black uppercase
  * headlines with tight tracking, letter-spaced Archivo labels, Montserrat
  * body copy, square cards with hairline borders and a single accent color.
+ *
+ * Surfaces stay light (white / paper) so any lender logo reads on them; dark
+ * is only used as a shade over photos.
  */
+
+/** Bump when templates change so cached PNGs/PDFs are re-rendered. */
+export const TEMPLATE_VERSION = "2";
 
 export interface RenderData {
   listing: Listing;
@@ -40,6 +46,7 @@ export interface RenderData {
   onBrand: string;
   onAccent: string;
   payments: PaymentOptions | null;
+  programs: ProgramOptions | null;
 }
 
 const MUTED = "#5b5b5b";
@@ -160,13 +167,15 @@ function Person({
   align?: "left" | "right";
 }) {
   const right = align === "right";
+  // Without a photo the name block carries the space on its own, a bit larger.
+  const k = photo ? 1 : 1.12;
   return (
     <div style={{ display: "flex", alignItems: "center", gap: size * 0.22, flexDirection: right ? "row-reverse" : "row" }}>
-      <Avatar src={photo} name={name} size={size} ring={ring} />
+      {photo ? <Avatar src={photo} name={name} size={size} ring={ring} /> : null}
       <div style={{ display: "flex", flexDirection: "column", alignItems: right ? "flex-end" : "flex-start", gap: 2 }}>
-        <div style={{ display: "flex", ...label(size * 0.22, color, 900) }}>{name}</div>
+        <div style={{ display: "flex", ...label(size * 0.22 * k, color, 900) }}>{name}</div>
         {sub.filter(Boolean).map((t, i) => (
-          <div key={i} style={{ display: "flex", ...body(size * 0.19, subColor) }}>
+          <div key={i} style={{ display: "flex", ...body(size * 0.19 * k, subColor) }}>
             {t}
           </div>
         ))}
@@ -175,15 +184,23 @@ function Person({
   );
 }
 
+/**
+ * Headshots for the agent + loan officer pair. Both or neither, so the loan
+ * officer never looks like the star of the agent's listing.
+ */
+function pairPhotos(d: RenderData): { agent: string | null; lo: string | null } {
+  return d.agentHeadshot && d.loHeadshot ? { agent: d.agentHeadshot, lo: d.loHeadshot } : { agent: null, lo: null };
+}
+
 function agentPerson(d: RenderData, size: number, color: string, subColor: string, ring: string) {
   const a = d.listing.agent;
-  return <Person photo={d.agentHeadshot} name={a.name} sub={[a.brokerage, a.phone]} size={size} color={color} subColor={subColor} ring={ring} />;
+  return <Person photo={pairPhotos(d).agent} name={a.name} sub={[a.brokerage, a.phone]} size={size} color={color} subColor={subColor} ring={ring} />;
 }
 
 function loPerson(d: RenderData, size: number, color: string, subColor: string, ring: string) {
   return (
     <Person
-      photo={d.loHeadshot}
+      photo={pairPhotos(d).lo}
       name={d.lo.name}
       sub={[`NMLS #${d.lo.nmls}`, d.lo.phone]}
       size={size}
@@ -309,7 +326,7 @@ export function StoryPost(d: RenderData) {
   const l = d.listing;
   const pay = payLabel(d);
   return (
-    <div style={{ display: "flex", flexDirection: "column", width: "100%", height: "100%", background: INK }}>
+    <div style={{ display: "flex", flexDirection: "column", width: "100%", height: "100%", background: "#fff" }}>
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: 84, background: d.accent }}>
         <div style={{ display: "flex", ...label(24, d.onAccent) }}>{`New in ${l.city}, ${l.state}`}</div>
       </div>
@@ -328,19 +345,19 @@ export function StoryPost(d: RenderData) {
       </div>
       <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, padding: "44px 64px 34px", gap: 18 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 22 }}>
-          <div style={{ display: "flex", ...head(100, "#fff") }}>{formatPrice(l.price)}</div>
-          {pay ? <div style={{ display: "flex", ...label(22, "rgba(255,255,255,0.7)") }}>{pay}</div> : null}
+          <div style={{ display: "flex", ...head(100, INK) }}>{formatPrice(l.price)}</div>
+          {pay ? <div style={{ display: "flex", ...label(22, MUTED) }}>{pay}</div> : null}
         </div>
-        <div style={{ display: "flex", ...label(28, "#fff", 900) }}>{`${streetLine(l)} · ${cityLine(l)}`}</div>
-        <StatsInline l={l} size={38} color="#fff" dim="rgba(255,255,255,0.6)" />
+        <div style={{ display: "flex", ...label(28, INK, 900) }}>{`${streetLine(l)} · ${cityLine(l)}`}</div>
+        <StatsInline l={l} size={38} color={INK} dim={MUTED} />
         <div style={{ display: "flex" }}>{openHousePill(d, 22)}</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 20, marginTop: "auto" }}>
-          <div style={{ display: "flex", height: 1, background: "rgba(255,255,255,0.2)" }} />
+          <div style={{ display: "flex", height: 2, background: LINE }} />
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            {agentPerson(d, 100, "#fff", "rgba(255,255,255,0.65)", "rgba(255,255,255,0.3)")}
-            {loPerson(d, 100, "#fff", "rgba(255,255,255,0.65)", "rgba(255,255,255,0.3)")}
+            {agentPerson(d, 100, INK, MUTED, LINE)}
+            {loPerson(d, 100, INK, MUTED, LINE)}
           </div>
-          <Compliance d={d} size={14} color="rgba(255,255,255,0.5)" />
+          <Compliance d={d} size={14} color={MUTED} />
         </div>
       </div>
     </div>
@@ -352,38 +369,30 @@ export function LandscapePost(d: RenderData) {
   const l = d.listing;
   const pay = payLabel(d);
   return (
-    <div style={{ display: "flex", width: "100%", height: "100%", background: INK }}>
+    <div style={{ display: "flex", width: "100%", height: "100%", background: "#fff" }}>
       <div style={{ display: "flex", flexDirection: "column", width: 540, padding: "44px 44px 26px", gap: 14 }}>
-        <Headline l={l} width={452} max={96} color="#fff" />
+        <Headline l={l} width={452} max={96} color={INK} />
         <div style={{ display: "flex", alignItems: "baseline", gap: 14, marginTop: 10 }}>
-          <div style={{ display: "flex", ...head(54, "#fff") }}>{formatPrice(l.price)}</div>
-          {pay ? <div style={{ display: "flex", ...label(14, "rgba(255,255,255,0.7)") }}>{pay}</div> : null}
+          <div style={{ display: "flex", ...head(54, INK) }}>{formatPrice(l.price)}</div>
+          {pay ? <div style={{ display: "flex", ...label(14, MUTED) }}>{pay}</div> : null}
         </div>
-        <div style={{ display: "flex", ...label(17, "#fff", 900) }}>{streetLine(l)}</div>
-        <div style={{ display: "flex", ...label(14, "rgba(255,255,255,0.65)") }}>{cityLine(l)}</div>
-        <StatsInline l={l} size={26} color="#fff" dim="rgba(255,255,255,0.6)" />
+        <div style={{ display: "flex", ...label(17, INK, 900) }}>{streetLine(l)}</div>
+        <div style={{ display: "flex", ...label(14, MUTED) }}>{cityLine(l)}</div>
+        <StatsInline l={l} size={26} color={INK} dim={MUTED} />
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: "auto" }}>
           <div style={{ display: "flex", gap: 22 }}>
             <Person
-              photo={d.agentHeadshot}
+              photo={pairPhotos(d).agent}
               name={l.agent.name}
               sub={[l.agent.brokerage]}
               size={58}
-              color="#fff"
-              subColor="rgba(255,255,255,0.65)"
-              ring="rgba(255,255,255,0.3)"
+              color={INK}
+              subColor={MUTED}
+              ring={LINE}
             />
-            <Person
-              photo={d.loHeadshot}
-              name={d.lo.name}
-              sub={[`NMLS #${d.lo.nmls}`]}
-              size={58}
-              color="#fff"
-              subColor="rgba(255,255,255,0.65)"
-              ring="rgba(255,255,255,0.3)"
-            />
+            <Person photo={pairPhotos(d).lo} name={d.lo.name} sub={[`NMLS #${d.lo.nmls}`]} size={58} color={INK} subColor={MUTED} ring={LINE} />
           </div>
-          <Compliance d={d} size={9} color="rgba(255,255,255,0.5)" />
+          <Compliance d={d} size={9} color={MUTED} />
         </div>
       </div>
       <div style={{ display: "flex", width: 10, background: d.accent }} />
@@ -480,19 +489,19 @@ export function Flyer(d: RenderData) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", width: "100%", height: "100%", background: "#fff" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", background: INK, padding: "44px 60px 36px" }}>
-        <Headline l={l} width={720} max={130} color="#fff" />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", background: "#fff", padding: "44px 60px 36px" }}>
+        <Headline l={l} width={720} max={130} color={INK} />
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 }}>
-          <div style={{ display: "flex", ...label(20, "rgba(255,255,255,0.65)") }}>{`${l.city}, ${l.state}`}</div>
+          <div style={{ display: "flex", ...label(20, MUTED) }}>{`${l.city}, ${l.state}`}</div>
           {d.logo ? <img src={d.logo} style={{ height: 56, objectFit: "contain" }} /> : null}
         </div>
       </div>
       <div style={{ display: "flex", height: 10, background: d.accent }} />
-      <div style={{ display: "flex", position: "relative", height: 530 }}>
+      <div style={{ display: "flex", position: "relative", height: 480 }}>
         <Photo src={p[0]} style={{ ...fill, width: "100%", height: "100%" }} />
         {formatOpenHouse(l) ? <div style={{ position: "absolute", left: 60, bottom: 30, display: "flex" }}>{openHousePill(d, 20)}</div> : null}
       </div>
-      <div style={{ display: "flex", height: 190, gap: 8, paddingTop: 8 }}>
+      <div style={{ display: "flex", height: 180, gap: 8, paddingTop: 8 }}>
         {[1, 2, 3].map((i) => (
           <Photo key={i} src={p[i] ?? p[0]} style={{ width: 420, height: "100%" }} />
         ))}
@@ -543,7 +552,7 @@ export function Flyer(d: RenderData) {
       <div style={{ display: "flex", flexDirection: "column", background: PAPER, borderTop: `2px solid ${LINE}`, padding: "24px 60px 20px", gap: 14 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Person
-            photo={d.agentHeadshot}
+            photo={pairPhotos(d).agent}
             name={l.agent.name}
             sub={[l.agent.brokerage, [l.agent.phone, l.agent.email].filter(Boolean).join(" · ")]}
             size={104}
@@ -552,7 +561,7 @@ export function Flyer(d: RenderData) {
             ring={LINE}
           />
           <Person
-            photo={d.loHeadshot}
+            photo={pairPhotos(d).lo}
             name={d.lo.name}
             sub={[
               [d.lo.title, `NMLS #${d.lo.nmls}`].filter(Boolean).join(" · "),
@@ -578,7 +587,6 @@ export function PaymentsFlyer(d: RenderData) {
   const opts = d.payments;
   if (!opts) return <div style={{ display: "flex" }} />;
   const lowest = Math.min(...opts.scenarios.map((s) => s.total));
-  const money = (n: number) => formatPrice(Math.round(n));
   const hasHoa = opts.scenarios.some((s) => s.hoa > 0);
   const headSize = fit(`from ${money(lowest)}/mo.*`, 1000, 104);
 
@@ -627,11 +635,11 @@ export function PaymentsFlyer(d: RenderData) {
                 border: `2px solid ${best ? INK : LINE}`,
               }}
             >
-              <div style={{ display: "flex", flexDirection: "column", background: best ? INK : PAPER, padding: "22px 24px 20px", gap: 6 }}>
-                <div style={{ display: "flex", ...label(18, best ? "#fff" : INK, 900) }}>{s.name}</div>
+              <div style={{ display: "flex", flexDirection: "column", background: best ? d.accent : PAPER, padding: "22px 24px 20px", gap: 6 }}>
+                <div style={{ display: "flex", ...label(18, best ? d.onAccent : INK, 900) }}>{s.name}</div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", minHeight: 28 }}>
-                  <div style={{ display: "flex", ...label(15, best ? "rgba(255,255,255,0.75)" : MUTED) }}>{s.detail}</div>
-                  {best ? <Pill text="Lowest payment" bg={d.accent} color={d.onAccent} size={11} /> : null}
+                  <div style={{ display: "flex", ...label(15, best ? d.onAccent : MUTED) }}>{s.detail}</div>
+                  {best ? <Pill text="Lowest payment" bg="#fff" color={INK} size={11} /> : null}
                 </div>
               </div>
               <div style={{ display: "flex", flexDirection: "column", padding: "24px 24px 26px", gap: 18, flexGrow: 1 }}>
@@ -665,37 +673,218 @@ export function PaymentsFlyer(d: RenderData) {
         })}
       </div>
 
-      <div style={{ display: "flex", flexGrow: 1, alignItems: "center", gap: 36, padding: "30px 60px" }}>
-        <Avatar src={d.loHeadshot} name={d.lo.name} size={150} ring={LINE} />
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, flexGrow: 1 }}>
-          <div style={{ display: "flex", ...label(15, MUTED) }}>Find the right option for you</div>
-          <div style={{ display: "flex", ...head(46, INK), lineHeight: 1 }}>{d.lo.name}</div>
-          <div style={{ display: "flex", ...body(19, INK, 500) }}>
-            {[d.lo.title, `NMLS #${d.lo.nmls}`, d.lo.company].filter(Boolean).join(" · ")}
-          </div>
-          <div style={{ display: "flex", ...body(19, INK) }}>{[d.lo.phone, d.lo.email].filter(Boolean).join("  ·  ")}</div>
-        </div>
-        {d.applyQr ? (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-            <div style={{ display: "flex", border: `2px solid ${LINE}`, padding: 8 }}>
-              <img src={d.applyQr} style={{ width: 150, height: 150 }} />
-            </div>
-            <div style={{ display: "flex", ...label(12, INK) }}>Get pre-approved</div>
-          </div>
-        ) : null}
-      </div>
+      <LoBlock d={d} kicker="Find the right option for you" />
+      <ListedByFooter d={d} disclaimer={opts.disclaimer} />
+    </div>
+  );
+}
 
-      <div style={{ display: "flex", flexDirection: "column", background: PAPER, borderTop: `2px solid ${LINE}`, padding: "18px 60px 20px", gap: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <Avatar src={d.agentHeadshot} name={l.agent.name} size={56} ring={LINE} />
-          <div style={{ display: "flex", ...body(16, INK) }}>
-            {`Listed by ${l.agent.name}${l.agent.brokerage ? `, ${l.agent.brokerage}` : ""}${l.agent.phone ? ` · ${l.agent.phone}` : ""}`}
+/* ------------------------- financing flyer parts ------------------------ */
+
+const money = (n: number) => formatPrice(Math.round(n));
+/** $83,412 → "$83,400" */
+const roughMoney = (n: number, to = 100) => formatPrice(Math.round(n / to) * to);
+
+/** Photo with a dark shade on the left, a kicker, a two-line headline and the address. */
+function FinanceHero({ d, kicker, lines, height }: { d: RenderData; kicker: string; lines: string[]; height: number }) {
+  const l = d.listing;
+  const size = Math.min(...lines.map((t) => fit(t, 1000, 110)));
+  return (
+    <div style={{ display: "flex", height, position: "relative" }}>
+      <Photo src={d.photos[0]} style={{ ...fill, width: "100%", height: "100%" }} />
+      <div
+        style={{ ...fill, display: "flex", backgroundImage: "linear-gradient(90deg, rgba(10,10,10,0.88) 0%, rgba(10,10,10,0.55) 55%, rgba(10,10,10,0.1) 100%)" }}
+      />
+      <div style={{ position: "absolute", left: 60, top: 46, bottom: 40, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ display: "flex", ...label(20, "rgba(255,255,255,0.8)") }}>{kicker}</div>
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            {lines.map((t) => (
+              <div key={t} style={{ display: "flex", ...head(size, "#fff") }}>
+                {t}
+              </div>
+            ))}
           </div>
         </div>
-        <div style={{ display: "flex", ...body(11.5, MUTED), lineHeight: 1.35 }}>
-          {`*${opts.disclaimer} ${complianceLine(d.lo)}.${d.lo.disclaimer ? ` ${d.lo.disclaimer}` : ""}`}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ display: "flex", ...label(22, "#fff", 900) }}>{`${streetLine(l)} · ${cityLine(l)}`}</div>
+          <div style={{ display: "flex", ...label(17, "rgba(255,255,255,0.75)") }}>
+            {[`List price ${formatPrice(l.price)}`, ...statItems(l).map(([v, k]) => `${v} ${k}`)].join("  ·  ")}
+          </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Loan officer contact block with logo and pre-approval QR, on white so any logo reads. */
+function LoBlock({ d, kicker }: { d: RenderData; kicker: string }) {
+  return (
+    <div style={{ display: "flex", flexGrow: 1, alignItems: "center", gap: 36, padding: "24px 60px" }}>
+      {d.loHeadshot ? <Avatar src={d.loHeadshot} name={d.lo.name} size={150} ring={LINE} /> : null}
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, flexGrow: 1 }}>
+        <div style={{ display: "flex", ...label(15, MUTED) }}>{kicker}</div>
+        <div style={{ display: "flex", ...head(46, INK), lineHeight: 1 }}>{d.lo.name}</div>
+        <div style={{ display: "flex", ...body(19, INK, 500) }}>{[d.lo.title, `NMLS #${d.lo.nmls}`, d.lo.company].filter(Boolean).join(" · ")}</div>
+        <div style={{ display: "flex", ...body(19, INK) }}>{[d.lo.phone, d.lo.email].filter(Boolean).join("  ·  ")}</div>
+        {d.logo ? <img src={d.logo} style={{ height: 46, marginTop: 8, objectFit: "contain", objectPosition: "left" }} /> : null}
+      </div>
+      {d.applyQr ? (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+          <div style={{ display: "flex", border: `2px solid ${LINE}`, padding: 8 }}>
+            <img src={d.applyQr} style={{ width: 150, height: 150 }} />
+          </div>
+          <div style={{ display: "flex", ...label(12, INK) }}>Get pre-approved</div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** "Listed by" line for the agent plus the full financing disclaimer. */
+function ListedByFooter({ d, disclaimer }: { d: RenderData; disclaimer: string }) {
+  const a = d.listing.agent;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", background: PAPER, borderTop: `2px solid ${LINE}`, padding: "18px 60px 20px", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        {d.agentHeadshot ? <Avatar src={d.agentHeadshot} name={a.name} size={56} ring={LINE} /> : null}
+        <div style={{ display: "flex", ...label(15, INK, 900) }}>{`Listed by ${a.name}`}</div>
+        <div style={{ display: "flex", ...body(16, MUTED) }}>{[a.brokerage, a.phone, a.email].filter(Boolean).join(" · ")}</div>
+      </div>
+      <div style={{ display: "flex", ...body(11.5, MUTED), lineHeight: 1.35 }}>
+        {`*${disclaimer} ${complianceLine(d.lo)}.${d.lo.disclaimer ? ` ${d.lo.disclaimer}` : ""}`}
+      </div>
+    </div>
+  );
+}
+
+/** 1275×1650 — "Ways to buy this home": four loan programs side by side. */
+export function WaysToBuyFlyer(d: RenderData) {
+  const opts = d.programs;
+  if (!opts) return <div style={{ display: "flex" }} />;
+  const width = (1275 - 120 - 22) / 2;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", width: "100%", height: "100%", background: "#fff" }}>
+      <FinanceHero d={d} kicker="Financing options" lines={[`${opts.scenarios.length} ways to buy`, "this home."]} height={400} />
+      <div style={{ display: "flex", height: 8, background: d.accent }} />
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 22, padding: "34px 60px 0" }}>
+        {opts.scenarios.map((s) => {
+          const rows: [string, string][] = [
+            ["Down payment", s.downPayment > 0 ? money(s.downPayment) : "$0"],
+            ["Est. cash to close", money(s.cashToClose)],
+            ["Mortgage insurance", s.mortgageInsurance > 0 ? `${money(s.mortgageInsurance)}/mo` : "None"],
+            ["Typical min. credit score", `${s.minCredit}+`],
+          ];
+          return (
+            <div key={s.id} style={{ display: "flex", flexDirection: "column", width, border: `2px solid ${LINE}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: PAPER, padding: "18px 24px" }}>
+                <div style={{ display: "flex", ...label(20, INK, 900) }}>{s.name}</div>
+                <div style={{ display: "flex", ...label(16, MUTED) }}>{s.detail}</div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", padding: "18px 24px 20px", gap: 12 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                    <div style={{ display: "flex", ...head(56, INK), lineHeight: 1 }}>{money(s.total)}</div>
+                    <div style={{ display: "flex", ...label(15, MUTED) }}>/mo est.*</div>
+                  </div>
+                  <div style={{ display: "flex", ...label(12, MUTED) }}>{`${s.ratePct}% rate${s.aprPct ? ` · ${s.aprPct}% APR` : ""} · 30-yr fixed`}</div>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column" }}>
+                  {rows.map(([name, value]) => (
+                    <div
+                      key={name}
+                      style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderTop: `1.5px solid ${LINE}`, ...body(17, INK) }}
+                    >
+                      <div style={{ display: "flex", color: MUTED }}>{name}</div>
+                      <div style={{ display: "flex", fontWeight: 600 }}>{value}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, ...body(16, INK, 600) }}>
+                  <div style={{ display: "flex", width: 8, height: 8, borderRadius: 8, background: INK }} />
+                  {`Best for: ${s.bestFor.toLowerCase()}`}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <LoBlock d={d} kicker="Not sure which fits? Let's find out" />
+      <ListedByFooter d={d} disclaimer={opts.disclaimer} />
+    </div>
+  );
+}
+
+/** 1275×1650 — "What it takes to qualify": down payment, credit and income by program, plus next steps. */
+export function QualifyFlyer(d: RenderData) {
+  const l = d.listing;
+  const opts = d.programs;
+  if (!opts) return <div style={{ display: "flex" }} />;
+  const cols = [380, 190, 160, 195, 230];
+  const headers = ["Program", "Down payment", "Min. credit", "Est. payment*", "Income needed*"];
+  const steps: [string, string][] = [
+    ["Get pre-approved", `Know your budget before you tour. Scan the code or call ${d.lo.name.split(" ")[0]}${d.lo.phone ? ` at ${d.lo.phone}` : ""}.`],
+    ["Gather your documents", "Two years of W-2s or tax returns, 30 days of pay stubs, two months of bank statements and a photo ID."],
+    ["Tour the home", `Schedule a showing with ${l.agent.name}${l.agent.phone ? ` at ${l.agent.phone}` : ""}.`],
+  ];
+  return (
+    <div style={{ display: "flex", flexDirection: "column", width: "100%", height: "100%", background: "#fff" }}>
+      <FinanceHero d={d} kicker="Buyer guide" lines={["What it takes", "to buy this home."]} height={400} />
+      <div style={{ display: "flex", height: 8, background: d.accent }} />
+      <div style={{ display: "flex", flexDirection: "column", padding: "30px 60px 0", gap: 18 }}>
+        <div style={{ display: "flex", flexDirection: "column", border: `2px solid ${LINE}` }}>
+          <div style={{ display: "flex", background: PAPER, padding: "14px 0" }}>
+            {headers.map((h, i) => (
+              <div key={h} style={{ display: "flex", width: cols[i], paddingLeft: 22, ...label(13, MUTED) }}>
+                {h}
+              </div>
+            ))}
+          </div>
+          {opts.scenarios.map((s) => {
+            const cells = [
+              s.downPayment > 0 ? `${money(s.downPayment)}` : "$0",
+              `${s.minCredit}+`,
+              `${money(s.total)}/mo`,
+              `${roughMoney(s.incomeNeeded, 1000)}/yr`,
+            ];
+            return (
+              <div key={s.id} style={{ display: "flex", alignItems: "center", borderTop: `1.5px solid ${LINE}`, padding: "20px 0" }}>
+                <div style={{ display: "flex", flexDirection: "column", width: cols[0], paddingLeft: 22, gap: 2 }}>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+                    <div style={{ display: "flex", ...label(18, INK, 900) }}>{s.name}</div>
+                    <div style={{ display: "flex", ...label(14, MUTED) }}>{s.detail}</div>
+                  </div>
+                  <div style={{ display: "flex", ...body(14, MUTED) }}>{s.bestFor}</div>
+                </div>
+                {cells.map((c, i) => (
+                  <div key={i} style={{ display: "flex", width: cols[i + 1], paddingLeft: 22, ...body(21, INK, i === 3 ? 700 : 500) }}>
+                    {c}
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 18, background: PAPER, padding: "16px 22px" }}>
+          <div style={{ display: "flex", ...label(14, INK, 900) }}>Other debts?</div>
+          <div style={{ display: "flex", ...body(17, INK) }}>
+            {`Every $500/mo in car, credit card or student loan payments adds about ${roughMoney(opts.incomePer500Debt)}/yr to the income needed.`}
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 22, paddingTop: 8 }}>
+          {steps.map(([title, text], i) => (
+            <div key={title} style={{ display: "flex", flexDirection: "column", width: (1155 - 44) / 3, gap: 8, borderTop: `3px solid ${INK}`, paddingTop: 14 }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
+                <div style={{ display: "flex", ...head(34, INK), lineHeight: 1 }}>{`0${i + 1}`}</div>
+                <div style={{ display: "flex", ...label(16, INK, 900) }}>{title}</div>
+              </div>
+              <div style={{ display: "flex", ...body(16, MUTED) }}>{text}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <LoBlock d={d} kicker="Your lender for this home" />
+      <ListedByFooter d={d} disclaimer={opts.disclaimer} />
     </div>
   );
 }
@@ -729,6 +918,26 @@ export const ASSETS = {
     print: true,
     needsPayments: true,
   },
+  ways: {
+    label: "Ways to buy flyer",
+    use: "Print · 8.5 × 11",
+    size: "1275 × 1650",
+    width: 1275,
+    height: 1650,
+    render: WaysToBuyFlyer,
+    print: true,
+    needsPayments: true,
+  },
+  qualify: {
+    label: "What it takes flyer",
+    use: "Print · 8.5 × 11",
+    size: "1275 × 1650",
+    width: 1275,
+    height: 1650,
+    render: QualifyFlyer,
+    print: true,
+    needsPayments: true,
+  },
 } satisfies Record<string, AssetDef>;
 
 export type AssetName = keyof typeof ASSETS;
@@ -744,7 +953,8 @@ export function isPrintAsset(name: AssetName): boolean {
 
 /** Assets offered for a listing, in display order. */
 export function assetsFor(l: Listing, lo: LoanOfficer): AssetName[] {
-  const hasPayments = paymentOptions(l, lo) != null;
+  // Financing flyers make no sense once the home has sold.
+  const hasPayments = l.status !== "just-sold" && paymentOptions(l, lo) != null;
   return (Object.keys(ASSETS) as AssetName[]).filter((name) => {
     const a: AssetDef = ASSETS[name];
     return !a.needsPayments || hasPayments;

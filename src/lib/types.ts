@@ -12,6 +12,8 @@ export type ListingStatus = keyof typeof LISTING_STATUSES;
 export interface PaymentSettings {
   /** Annual interest rate, e.g. 6.75 */
   ratePct: number;
+  /** APR for that rate. Reg Z requires it whenever an ad states a rate or payment. */
+  aprPct?: number;
   /** Down payment percentage, e.g. 20 */
   downPaymentPct: number;
   termYears: number;
@@ -73,6 +75,9 @@ export interface Financing {
   /** FHA note rate; defaults to ratePct. */
   fhaRatePct?: number;
   fhaAprPct?: number;
+  /** VA note rate; defaults to the FHA rate. */
+  vaRatePct?: number;
+  vaAprPct?: number;
   /** Actual annual property taxes (from MLS). Estimated by state when absent. */
   annualTaxes?: number;
   /** Annual homeowners insurance. Estimated by state when absent. */
