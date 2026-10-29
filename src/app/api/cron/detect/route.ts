@@ -1,7 +1,7 @@
 import { isAuthorizedApiRequest, unauthorized } from "@/lib/auth";
 import { errorResponse } from "@/lib/api";
 import { originFromRequest } from "@/lib/site";
-import { runDetection } from "@/lib/detect/run";
+import { DEFAULT_DAYS, runDetection } from "@/lib/detect/run";
 
 // Feed requests per metro plus one photo-scrape batch.
 export const maxDuration = 300;
@@ -15,13 +15,13 @@ function authorized(req: Request) {
 }
 
 /**
- * GET /api/cron/detect[?days=2&dryRun=1] — pull new listings for every metro,
+ * GET /api/cron/detect[?days=7&dryRun=1] — pull new listings for every metro,
  * match listing agents to the roster and create kits. Runs daily via vercel.json.
  */
 export async function GET(req: Request) {
   if (!authorized(req)) return unauthorized();
   const sp = new URL(req.url).searchParams;
-  const days = Math.min(30, Math.max(1, Number(sp.get("days")) || 2));
+  const days = Math.min(30, Math.max(1, Number(sp.get("days")) || DEFAULT_DAYS));
   const dryRun = ["1", "true"].includes(sp.get("dryRun") ?? "");
   try {
     const { run, detections } = await runDetection({ days, dryRun, origin: originFromRequest(req) });

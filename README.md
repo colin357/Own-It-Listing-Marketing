@@ -128,7 +128,7 @@ separated `photos`. Statuses like `"Sold"`, `"Pending"`, `"Price Reduced"` are n
 | `GET` / `PUT` / `DELETE` | `/api/loan-officers/:slug` | |
 | `GET` / `POST` | `/api/roster?type=agents\|metros` | Read or replace the roster / metros (CSV or JSON body) |
 | `GET` | `/api/detections?status=review` | Detected listings and the last run |
-| `GET` | `/api/cron/detect?dryRun=1&days=2` | Run detection now (also `Authorization: Bearer $CRON_SECRET`) |
+| `GET` | `/api/cron/detect?dryRun=1&days=7` | Run detection now (also `Authorization: Bearer $CRON_SECRET`) |
 
 Listing slugs are derived from the address and never change once created, so links you've sent stay valid.
 
@@ -148,7 +148,7 @@ roster and builds their kits automatically, so the loan officer has a finished l
 
 How a run works:
 
-- For each metro, RentCast returns active listings from the last 2 days within the radius (overlapping
+- For each metro, RentCast returns active listings from the last 7 days within the radius (overlapping
   metros are de-duplicated). Each listing has the listing agent's name, email, phone and brokerage.
 - The listing agent is matched against the roster by name (nicknames like Will/William count), and
   only against agents whose loan officer works that area. A matching brokerage raises confidence and a

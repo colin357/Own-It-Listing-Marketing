@@ -125,7 +125,10 @@ export interface RunOptions {
   origin: string;
 }
 
-export async function runDetection({ days = 2, dryRun = false, origin }: RunOptions) {
+/** A listing counts as new for this many days after it first appears. */
+export const DEFAULT_DAYS = 7;
+
+export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin }: RunOptions) {
   const startedAt = new Date().toISOString();
   const provider = listingProvider();
   if (!provider) throw new Error("No listings feed configured. Set RENTCAST_API_KEY.");
