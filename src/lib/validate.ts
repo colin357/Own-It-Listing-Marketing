@@ -202,6 +202,7 @@ export function parseLoanOfficerInput(raw: Raw, existing?: LoanOfficer): LoanOff
     brandColor: hex(raw.brandColor),
     accentColor: hex(raw.accentColor),
     disclaimer: str(raw.disclaimer),
+    showPayments: bool(raw.showPayments, existing?.showPayments ?? true),
     payment,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,

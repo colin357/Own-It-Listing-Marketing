@@ -15,7 +15,7 @@ import {
   statusLabel,
   streetLine,
 } from "@/lib/format";
-import { ASSETS, assetsFor, isPrintAsset, TEMPLATE_VERSION } from "@/lib/render/templates";
+import { ASSETS, assetsFor, assetVersion, isPrintAsset } from "@/lib/render/templates";
 import { CopyButton } from "@/components/CopyButton";
 import { ShareButton } from "@/components/ShareButton";
 import { AgentPhotoUpload } from "@/components/AgentPhotoUpload";
@@ -33,7 +33,7 @@ export async function generateMetadata({ params }: PageProps<"/l/[slug]">): Prom
   const { listing: l, lo } = kit;
   const title = `${statusLabel(l)}: ${streetLine(l)} – Marketing Kit`;
   const description = `Co-branded social posts, flyers and captions for ${streetLine(l)}, ${l.city}. Courtesy of ${lo.name}, ${lo.company}.`;
-  const image = assetUrl(l.slug, "landscape.png", `${TEMPLATE_VERSION}-${l.updatedAt}`);
+  const image = assetUrl(l.slug, "landscape.png", assetVersion(l));
   return {
     title,
     description,
@@ -59,7 +59,7 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
   const emails = buildEmails(l, lo);
   const pay = paymentInfo(l, lo);
   const oh = formatOpenHouse(l);
-  const v = `${TEMPLATE_VERSION}-${l.updatedAt}`;
+  const v = assetVersion(l);
   const order = assetsFor(l, lo);
   const agentFirst = l.agent.name.split(" ")[0];
   const loFirst = lo.name.split(" ")[0];

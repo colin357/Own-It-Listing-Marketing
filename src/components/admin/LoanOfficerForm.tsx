@@ -40,9 +40,15 @@ export function LoanOfficerForm({ slug, initial }: { slug: string | null; initia
         </div>
       </fieldset>
       <fieldset>
-        <legend>Default rate (optional)</legend>
+        <legend>Payments</legend>
+        <input type="hidden" name="showPayments__present" value="1" />
+        <label className="check">
+          <input type="checkbox" name="showPayments" defaultChecked={v.showPayments !== "false"} />
+          Show payment estimates and the financing flyers on this loan officer&apos;s kits
+        </label>
         <p className="muted small">
-          Used when a listing comes in without its own rate. Leave blank to only show payments on listings that include one. Always include the APR with a rate (Reg Z).
+          Rates come from national averages, refreshed every day. To use this loan officer&apos;s own rate instead, enter it
+          below with its APR (Reg Z). Leave blank to use national averages.
         </p>
         <div className="grid">
           <TextInput label="Rate %" name="paymentRatePct" values={v} inputMode="decimal" placeholder="6.5" />

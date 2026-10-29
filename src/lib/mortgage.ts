@@ -48,6 +48,8 @@ const FHA_ANNUAL_MIP_HIGH_PCT = 0.75;
 const FHA_HIGH_BALANCE = 726_200;
 /** VA funding fee, first use, under 5% down. Financed into the loan; no monthly mortgage insurance. */
 const VA_FUNDING_FEE_PCT = 2.15;
+/** Lender fees (origination, points, etc.) assumed when estimating an APR from a published rate. */
+export const APR_FEES_PCT = 1;
 /** Buyer closing costs + prepaids, as % of price, for "cash to close" estimates. */
 const CLOSING_COST_PCT = 3;
 
@@ -107,6 +109,32 @@ export function estimateAnnualInsurance(price: number, state: string): number {
   return (per300k * price * DWELLING_SHARE) / 300_000;
 }
 
+function presentValue(payment: number, monthlyRate: number, n = TERM_YEARS * 12): number {
+  return monthlyRate === 0 ? payment * n : (payment * (1 - Math.pow(1 + monthlyRate, -n))) / monthlyRate;
+}
+
+/**
+ * Estimated APR for a 30-year fixed loan at `ratePct`: the rate at which the
+ * payments (including FHA annual MIP) repay the amount financed, after lender
+ * fees of APR_FEES_PCT and FHA upfront MIP / VA funding fee. Conventional
+ * assumes 20% down (no PMI). Scale-free, so any loan amount gives the same APR.
+ */
+export function estimateApr(program: "conventional" | "fha" | "va", ratePct: number): number {
+  const base = 100_000;
+  const note = program === "fha" ? base * (1 + FHA_UFMIP_PCT / 100) : program === "va" ? base * (1 + VA_FUNDING_FEE_PCT / 100) : base;
+  const mi = program === "fha" ? (base * FHA_ANNUAL_MIP_PCT) / 100 / 12 : 0;
+  const payment = principalAndInterest(note, ratePct) + mi;
+  const financed = base * (1 - APR_FEES_PCT / 100);
+  let lo = 0;
+  let hi = 0.05;
+  for (let k = 0; k < 100; k++) {
+    const mid = (lo + hi) / 2;
+    if (presentValue(payment, mid) > financed) lo = mid;
+    else hi = mid;
+  }
+  return Math.round(lo * 12 * 100 * 1000) / 1000;
+}
+
 interface Inputs {
   price: number;
   ratePct: number;
@@ -118,6 +146,7 @@ interface Inputs {
   taxes: number;
   insurance: number;
   hoa: number;
+  rateNote?: string;
 }
 
 function inputs(l: Listing, lo: LoanOfficer) {
@@ -144,6 +173,7 @@ function inputs(l: Listing, lo: LoanOfficer) {
     taxes: annualTaxes / 12,
     insurance: annualInsurance / 12,
     hoa: f?.hoaMonthly ?? 0,
+    rateNote: fromListing ? f?.rateNote : undefined,
   };
   return { i, annualTaxes, annualInsurance, taxesEstimated: f?.annualTaxes == null, insuranceEstimated: f?.annualInsurance == null };
 }
@@ -240,6 +270,7 @@ function buildDisclaimer(
     `Payments include principal, interest, ${x.taxesEstimated ? "estimated " : ""}property taxes of ${formatPrice(Math.round(x.annualTaxes))}/yr, ${x.insuranceEstimated ? "estimated " : ""}homeowners insurance of ${formatPrice(Math.round(x.annualInsurance))}/yr${x.i.hoa ? `, HOA dues of ${formatPrice(x.i.hoa)}/mo` : ""} and mortgage insurance where applicable.`,
     hasFha ? `FHA includes a ${FHA_UFMIP_PCT}% upfront MIP financed into the loan and annual MIP; FHA loans are subject to county loan limits.` : "",
     hasVa ? `VA assumes first-time use with the ${VA_FUNDING_FEE_PCT}% funding fee financed; eligibility required.` : "",
+    x.i.rateNote ?? "",
     ...extra,
     `Actual rates, payments and mortgage insurance vary based on credit, loan amount, occupancy and other factors. Rates subject to change without notice. Not a commitment to lend. Subject to credit approval.`,
   ]

@@ -32,6 +32,13 @@ import { paymentOptions, type PaymentOptions, type ProgramOptions } from "../mor
 /** Bump when templates change so cached PNGs/PDFs are re-rendered. */
 export const TEMPLATE_VERSION = "2";
 
+/** Cache key for a listing's graphics: changes with the templates, the listing and the rates shown. */
+export function assetVersion(l: Listing): string {
+  const f = l.financing;
+  const rates = f && l.showPayment ? [f.ratePct, f.aprPct, f.fhaRatePct, f.vaRatePct].join("_") : "none";
+  return `${TEMPLATE_VERSION}-${l.updatedAt}-${rates}`;
+}
+
 export interface RenderData {
   listing: Listing;
   lo: LoanOfficer;
@@ -185,10 +192,20 @@ function Person({
 }
 
 /**
+ * The loan officer (name, NMLS, logo, pre-approval QR, lender disclosures)
+ * appears only on graphics that mention a payment. Otherwise it's purely the
+ * agent's listing post.
+ */
+function showsLo(d: RenderData): boolean {
+  return paymentInfo(d.listing, d.lo) != null;
+}
+
+/**
  * Headshots for the agent + loan officer pair. Both or neither, so the loan
  * officer never looks like the star of the agent's listing.
  */
 function pairPhotos(d: RenderData): { agent: string | null; lo: string | null } {
+  if (!showsLo(d)) return { agent: d.agentHeadshot, lo: null };
   return d.agentHeadshot && d.loHeadshot ? { agent: d.agentHeadshot, lo: d.loHeadshot } : { agent: null, lo: null };
 }
 
@@ -198,6 +215,7 @@ function agentPerson(d: RenderData, size: number, color: string, subColor: strin
 }
 
 function loPerson(d: RenderData, size: number, color: string, subColor: string, ring: string) {
+  if (!showsLo(d)) return null;
   return (
     <Person
       photo={pairPhotos(d).lo}
@@ -213,6 +231,7 @@ function loPerson(d: RenderData, size: number, color: string, subColor: string, 
 }
 
 function Compliance({ d, size, color }: { d: RenderData; size: number; color: string }) {
+  if (!showsLo(d)) return null;
   const pay = paymentInfo(d.listing, d.lo);
   const text = [complianceLine(d.lo), pay?.disclaimer, d.lo.disclaimer].filter(Boolean).join("  ");
   return <div style={{ display: "flex", ...body(size, color), lineHeight: 1.3 }}>{text}</div>;
@@ -390,7 +409,9 @@ export function LandscapePost(d: RenderData) {
               subColor={MUTED}
               ring={LINE}
             />
-            <Person photo={pairPhotos(d).lo} name={d.lo.name} sub={[`NMLS #${d.lo.nmls}`]} size={58} color={INK} subColor={MUTED} ring={LINE} />
+            {showsLo(d) ? (
+              <Person photo={pairPhotos(d).lo} name={d.lo.name} sub={[`NMLS #${d.lo.nmls}`]} size={58} color={INK} subColor={MUTED} ring={LINE} />
+            ) : null}
           </div>
           <Compliance d={d} size={9} color={MUTED} />
         </div>
@@ -484,7 +505,7 @@ export function Flyer(d: RenderData) {
   const pay = payLabel(d);
   const qrs: { src: string; label: string }[] = [];
   if (d.listingQr) qrs.push({ src: d.listingQr, label: "View listing" });
-  if (d.applyQr && l.status !== "just-sold") qrs.push({ src: d.applyQr, label: "Get pre-approved" });
+  if (d.applyQr && showsLo(d)) qrs.push({ src: d.applyQr, label: "Get pre-approved" });
   const qrSize = qrs.length > 1 ? 130 : 160;
 
   return (
@@ -493,7 +514,7 @@ export function Flyer(d: RenderData) {
         <Headline l={l} width={720} max={130} color={INK} />
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 }}>
           <div style={{ display: "flex", ...label(20, MUTED) }}>{`${l.city}, ${l.state}`}</div>
-          {d.logo ? <img src={d.logo} style={{ height: 56, objectFit: "contain" }} /> : null}
+          {d.logo && showsLo(d) ? <img src={d.logo} style={{ height: 56, objectFit: "contain" }} /> : null}
         </div>
       </div>
       <div style={{ display: "flex", height: 10, background: d.accent }} />
@@ -560,20 +581,22 @@ export function Flyer(d: RenderData) {
             subColor={MUTED}
             ring={LINE}
           />
-          <Person
-            photo={pairPhotos(d).lo}
-            name={d.lo.name}
-            sub={[
-              [d.lo.title, `NMLS #${d.lo.nmls}`].filter(Boolean).join(" · "),
-              d.lo.company,
-              [d.lo.phone, d.lo.email].filter(Boolean).join(" · "),
-            ]}
-            size={104}
-            color={INK}
-            subColor={MUTED}
-            ring={LINE}
-            align="right"
-          />
+          {showsLo(d) ? (
+            <Person
+              photo={pairPhotos(d).lo}
+              name={d.lo.name}
+              sub={[
+                [d.lo.title, `NMLS #${d.lo.nmls}`].filter(Boolean).join(" · "),
+                d.lo.company,
+                [d.lo.phone, d.lo.email].filter(Boolean).join(" · "),
+              ]}
+              size={104}
+              color={INK}
+              subColor={MUTED}
+              ring={LINE}
+              align="right"
+            />
+          ) : null}
         </div>
         <Compliance d={d} size={13} color={MUTED} />
       </div>

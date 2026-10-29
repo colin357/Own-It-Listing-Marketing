@@ -15,7 +15,8 @@ function formToRecord(fd: FormData): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [k, v] of fd.entries()) if (typeof v === "string" && !k.startsWith("$")) out[k] = v;
   // Unchecked checkboxes are absent from FormData.
-  if (fd.has("showPayment__present") && !fd.has("showPayment")) out.showPayment = "false";
+  for (const key of fd.keys())
+    if (key.endsWith("__present") && !fd.has(key.slice(0, -"__present".length))) out[key.slice(0, -"__present".length)] = "false";
   return out;
 }
 

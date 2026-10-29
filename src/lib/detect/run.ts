@@ -7,6 +7,7 @@ import { AUTO_CONFIDENCE, buildMatcher, nameParts, type Match } from "./match";
 import { getMetros, getRoster } from "./roster";
 import { listingProvider, lookupPhotos, photoSource, type PhotoResult } from "./providers";
 import type { Detection, DetectionRun, SourceListing } from "./types";
+import { refreshMarketRates } from "../rates";
 
 /** Loan officer record for a roster/metro name, matched on first + last name. */
 function loFinder(los: LoanOfficer[]) {
@@ -139,6 +140,14 @@ export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin
   const match = buildMatcher(roster, metros);
   const findLo = loFinder(los);
   const errors: string[] = [];
+  // Payment estimates use national average rates; refresh them with every run.
+  if (!dryRun) {
+    try {
+      await refreshMarketRates();
+    } catch (err) {
+      errors.push(`Rate refresh failed, keeping the previous rates: ${(err as Error).message}`);
+    }
+  }
   const seen = new Set<string>();
   const found: { listing: SourceListing; match: Match; slug: string }[] = [];
   let requests = 0;

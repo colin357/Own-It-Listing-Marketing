@@ -13,4 +13,5 @@ next-env.d.ts
 /data/roster.json
 /data/metros.json
 /data/detection-run.json
+/data/market-rates.json
 /data/mock-listings.json

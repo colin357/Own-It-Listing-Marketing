@@ -57,6 +57,7 @@ export function loanOfficerToValues(lo: LoanOfficer): Record<string, string> {
     brandColor: s(lo.brandColor),
     accentColor: s(lo.accentColor),
     disclaimer: s(lo.disclaimer),
+    showPayments: String(lo.showPayments !== false),
     paymentRatePct: s(lo.payment?.ratePct),
     paymentAprPct: s(lo.payment?.aprPct),
     paymentDownPct: s(lo.payment?.downPaymentPct),

@@ -39,6 +39,8 @@ export interface LoanOfficer {
   accentColor?: string;
   /** Extra compliance text appended to every material. */
   disclaimer?: string;
+  /** false hides payment estimates and the financing flyers on this LO's kits. */
+  showPayments?: boolean;
   /** When set, materials show an estimated monthly payment. */
   payment?: PaymentSettings;
   createdAt: string;
@@ -78,6 +80,8 @@ export interface Financing {
   /** VA note rate; defaults to the FHA rate. */
   vaRatePct?: number;
   vaAprPct?: number;
+  /** Where the rates came from, added to the disclaimer (e.g. national averages as of a date). */
+  rateNote?: string;
   /** Actual annual property taxes (from MLS). Estimated by state when absent. */
   annualTaxes?: number;
   /** Annual homeowners insurance. Estimated by state when absent. */

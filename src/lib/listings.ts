@@ -3,6 +3,7 @@ import { listings, loanOfficers, uniqueSlug } from "./store";
 import { slugify } from "./format";
 import { parseListingInput, parseLoanOfficerInput, ValidationError } from "./validate";
 import type { Listing, LoanOfficer } from "./types";
+import { applyRates, currentMarketRates } from "./rates";
 
 export async function createListing(raw: Record<string, unknown>): Promise<Listing> {
   const input = parseListingInput(raw);
@@ -40,7 +41,7 @@ export async function saveLoanOfficer(raw: Record<string, unknown>, existingSlug
 export async function getKit(slug: string): Promise<{ listing: Listing; lo: LoanOfficer } | null> {
   const listing = await listings.get(slug);
   if (!listing) return null;
-  const lo = await loanOfficers.get(listing.loanOfficerSlug);
+  const [lo, rates] = await Promise.all([loanOfficers.get(listing.loanOfficerSlug), currentMarketRates()]);
   if (!lo) return null;
-  return { listing, lo };
+  return { listing: applyRates(listing, lo, rates), lo };
 }

@@ -85,7 +85,7 @@ export function paymentInfo(l: Listing, lo: LoanOfficer) {
   return {
     monthly,
     label: `${formatPrice(monthly)}/mo*`,
-    disclaimer: `*Est. principal & interest only on a ${settings.termYears}-yr fixed loan at ${ratePct}% interest${apr ? ` (${apr}% APR)` : ""} with ${settings.downPaymentPct}% down. Excludes taxes, insurance, HOA and PMI. Rates subject to change. Not a commitment to lend.`,
+    disclaimer: `*Est. principal & interest only on a ${settings.termYears}-yr fixed loan at ${ratePct}% interest${apr ? ` (${apr}% APR)` : ""} with ${settings.downPaymentPct}% down. Excludes taxes, insurance, HOA and PMI.${l.financing?.ratePct != null && l.financing.rateNote ? ` ${l.financing.rateNote}` : ""} Rates subject to change. Not a commitment to lend.`,
   };
 }
 
