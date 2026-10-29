@@ -112,9 +112,9 @@ export function ListingForm({
           <TextInput label="Annual property taxes" name="annualTaxes" values={v} inputMode="numeric" placeholder="Estimate" />
           <TextInput label="Annual insurance" name="annualInsurance" values={v} inputMode="numeric" placeholder="Estimate" />
           <TextInput label="HOA / month" name="hoaMonthly" values={v} inputMode="numeric" />
-          <TextInput label="Seller credit $" name="sellerCredit" values={v} inputMode="numeric" placeholder="None" />
-          <Field label="Seller credit use">
-            <select name="buydown" defaultValue={v.buydown || "2-1"}>
+          <Field label="Seller incentive">
+            <select name="buydown" defaultValue={v.buydown || "none"}>
+              <option value="none">None</option>
               {Object.entries(BUYDOWNS).map(([k, b]) => (
                 <option key={k} value={k}>
                   {b.label}

@@ -280,7 +280,7 @@ function buildDisclaimer(
     hasFha ? `FHA includes a ${FHA_UFMIP_PCT}% upfront MIP financed into the loan and annual MIP; FHA loans are subject to county loan limits.` : "",
     hasVa ? `VA assumes first-time use with the ${VA_FUNDING_FEE_PCT}% funding fee financed; eligibility required.` : "",
     x.i.rateNote ?? "",
-    activeConcession(l) ? concessionDisclaimer(activeConcession(l)!, scenarios.flatMap((s) => s.concession ?? [])) : "",
+    activeConcession(l) ? concessionDisclaimer(activeConcession(l)!) : "",
     ...extra,
     `Actual rates, payments and mortgage insurance vary based on credit, loan amount, occupancy and other factors. Rates subject to change without notice. Not a commitment to lend. Subject to credit approval.`,
   ]

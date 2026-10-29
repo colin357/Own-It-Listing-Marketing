@@ -87,7 +87,7 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
           )}
           <nav className="nav-links">
             <a href="#graphics">Graphics</a>
-            {basePrograms ? <a href="#seller-credit">Seller credit</a> : null}
+            {basePrograms ? <a href="#seller-credit">Seller incentive</a> : null}
             <a href="#captions">Captions</a>
             <a href="#emails">Emails</a>
             <a href="#contact">Contact</a>
@@ -188,19 +188,17 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
         <section className="credit" id="seller-credit">
           <div className="wrap credit-inner">
             <div className="credit-intro">
-              <p className="eyebrow">Seller credit</p>
+              <p className="eyebrow">Seller incentive</p>
               <h2 className="display display-md">
                 Offer a
                 <br />
                 buydown.
               </h2>
               <p className="lead">
-                Enter what the seller will put toward the buyer&apos;s costs and pick how buyers can use it. Every graphic, flyer,
-                caption and email updates to match.
+                Is the seller willing to help with the buyer&apos;s costs? Pick an option and every graphic, flyer, caption and
+                email updates to match.
               </p>
-              <p className="muted">
-                Limits by loan type are checked for you. Questions about the right option? Ask {loFirst}.
-              </p>
+              <p className="muted">Not sure which to pick? A 2-1 buydown is the most popular. Or ask {loFirst}.</p>
             </div>
             <ConcessionCalculator slug={l.slug} price={l.price} scenarios={basePrograms.scenarios} initial={credit} />
           </div>

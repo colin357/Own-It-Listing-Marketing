@@ -952,7 +952,7 @@ export function BuydownFlyer(d: RenderData) {
   if (!c || !opts) return <div style={{ display: "flex" }} />;
   const width = (1275 - 120 - 22) / 2;
   const lines =
-    c.type === "closing-costs" ? [`${money(c.amount)} toward`, "closing costs."] : ["Seller-paid", `${c.type === "permanent" ? "rate" : c.type} buydown.`];
+    c.type === "closing-costs" ? [`${money(c.amount)} toward`, "closing costs."] : ["Seller-paid", `${c.type === "permanent" ? "rate" : c.type}\u00a0buydown.`];
   const best = Math.max(...opts.scenarios.map((s) => s.concession?.monthlySavings ?? 0));
   return (
     <div style={{ display: "flex", flexDirection: "column", width: "100%", height: "100%", background: "#fff" }}>
@@ -960,8 +960,8 @@ export function BuydownFlyer(d: RenderData) {
       <div style={{ display: "flex", height: 8, background: d.accent }} />
       <div style={{ display: "flex", alignItems: "center", gap: 40, padding: "30px 60px 0" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 4, flexShrink: 0 }}>
-          <div style={{ display: "flex", ...label(14, MUTED) }}>{c.type === "closing-costs" ? "Seller credit" : `Saves up to ${money(best)}/mo`}</div>
-          <div style={{ display: "flex", ...head(64, INK), lineHeight: 1 }}>{money(c.amount)}</div>
+          <div style={{ display: "flex", ...label(14, MUTED) }}>{c.type === "closing-costs" ? "Seller credit" : "Saves up to"}</div>
+          <div style={{ display: "flex", ...head(64, INK), lineHeight: 1 }}>{c.type === "closing-costs" ? money(c.amount) : `${money(best)}/mo`}</div>
         </div>
         <div style={{ display: "flex", ...body(20, INK) }}>{`${concessionSentence(c)} Here's what it means on each loan.*`}</div>
       </div>
@@ -978,21 +978,18 @@ export function BuydownFlyer(d: RenderData) {
             big = [money(e.total), "/mo for 30 years*"];
             rows = [
               ["Rate", `${e.before.ratePct}% → ${e.ratePct}%`],
-              ["Monthly savings", `${money(e.monthlySavings)}/mo`],
-              ["Discount points paid by seller", `${e.points}`],
+              ["You save", `${money(e.monthlySavings)}/mo`],
             ];
-          } else {
+          } else if (e.toClosing > 0) {
             big = [money(e.cashToClose), "est. cash to close*"];
             rows = [
               ["Before the credit", money(e.before.cashToClose)],
-              ["Seller credit to closing costs", `−${money(e.toClosing)}`],
+              ["Seller credit", `−${money(e.toClosing)}`],
             ];
+          } else {
+            big = [money(s.total), "/mo*"];
+            rows = [["This incentive", "Not available on this loan"]];
           }
-          const notes: string[] = [];
-          if (e.type !== "closing-costs" && !e.schedule.length && !e.rateCut)
-            notes.push(e.buydownCost ? `Covers closing costs instead; the full buydown needs ${money(e.buydownCost)}` : "Covers closing costs instead");
-          else if (e.toClosing > 0 && e.type !== "closing-costs") notes.push(`Plus ${money(e.toClosing)} toward closing costs`);
-          if (e.capped) notes.push(`${s.name} limit is ${e.rule.pct}%${e.rule.of === "loan" ? " of the loan" : ""}, so the credit is ${money(e.credit)}`);
           return (
             <div key={s.id} style={{ display: "flex", flexDirection: "column", width, border: `2px solid ${LINE}` }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: PAPER, padding: "16px 24px" }}>
@@ -1017,18 +1014,12 @@ export function BuydownFlyer(d: RenderData) {
                     </div>
                   ))}
                 </div>
-                {notes.map((n) => (
-                  <div key={n} style={{ display: "flex", alignItems: "center", gap: 10, ...body(14, INK, 600) }}>
-                    <div style={{ display: "flex", width: 7, height: 7, borderRadius: 7, background: INK, flexShrink: 0 }} />
-                    {n}
-                  </div>
-                ))}
               </div>
             </div>
           );
         })}
       </div>
-      <LoBlock d={d} kicker="Ask how the seller credit works for you" />
+      <LoBlock d={d} kicker="Ask how this works for you" />
       <ListedByFooter d={d} disclaimer={opts.paymentDisclaimer} />
     </div>
   );
@@ -1056,7 +1047,7 @@ export const ASSETS = {
   landscape: { label: "Link post", use: "Facebook · LinkedIn", size: "1200 × 630", width: 1200, height: 630, render: LandscapePost },
   flyer: { label: "Flyer", use: "Print · 8.5 × 11", size: "1275 × 1650", width: 1275, height: 1650, render: Flyer, print: true },
   buydown: {
-    label: "Seller credit flyer",
+    label: "Seller incentive flyer",
     use: "Print · 8.5 × 11",
     size: "1275 × 1650",
     width: 1275,

@@ -133,7 +133,7 @@ export function buildEmails(l: Listing, lo: LoanOfficer): Email[] {
         l.lotSize ? `Lot: ${l.lotSize}` : null,
         l.yearBuilt ? `Built: ${l.yearBuilt}` : null,
         highlightList(l, 4) ? `\n${highlightList(l, 4)}` : null,
-        c ? `\nSeller concession: ${formatPrice(c.amount)} (${c.type === "closing-costs" ? "closing cost credit" : c.type === "permanent" ? "permanent rate buydown" : `${c.type} buydown`}), within each loan program's limits.` : null,
+        credit ? `\n${credit}` : null,
         oh ? `\nOpen house: ${oh}` : null,
         link ? `\n${link}` : null,
         "",

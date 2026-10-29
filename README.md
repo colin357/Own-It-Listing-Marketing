@@ -110,13 +110,14 @@ Send the rate with the listing to unlock the payment-options flyer and the "Est.
 | `annualTaxes` | `taxes` | Actual annual property taxes (from MLS). Otherwise estimated by state |
 | `annualInsurance` | `insurance` | Annual homeowners insurance. Otherwise estimated by state |
 | `hoaMonthly` | `hoa` | Added to every scenario |
-| `sellerCredit` | `sellerConcession`, `concession.amount` | Seller concession in dollars. Empty or `0` removes it |
-| `buydown` | `buydownType`, `concession.type` | How buyers use it: `2-1`, `1-0`, `3-2-1`, `permanent` or `closing-costs` (default) |
+| `buydown` | `buydownType`, `concession.type` | Seller incentive: `2-1`, `1-0`, `3-2-1`, `permanent`, `closing-costs` or `none` |
+| `sellerCredit` | `sellerConcession`, `concession.amount` | Closing cost credit in dollars (defaults to ~3% of the price) |
 
-Agents can also set the seller credit themselves on the kit page (Seller credit section). Every graphic,
-the flyers, captions and emails update, and a "Seller credit" flyer is added. Concession limits by loan
-type (Conventional 3/6/9% by down payment, 2% investment; FHA 6%; VA 4% of the loan plus normal closing
-costs; USDA 6%) are applied per scenario and live in `src/lib/concessions.ts`.
+Agents can also pick the seller incentive themselves on the kit page (Seller incentive section): one tap and
+every graphic, the flyers, captions and emails update, and a "Seller incentive" flyer is added. Each option
+has a fixed cost per loan (the buydown, 2 discount points, or the closing cost credit). An option that costs
+more than a loan's seller concession limit (Conventional 3/6/9% by down payment; FHA 6%; VA 4% of the loan
+plus normal closing costs) is left off that loan. Limits live in `src/lib/concessions.ts`.
 
 Scenarios are 30-year fixed. Conventional 5% down includes estimated PMI; FHA includes the 1.75%
 upfront MIP financed into the loan plus annual MIP. All assumptions (state tax/insurance tables,

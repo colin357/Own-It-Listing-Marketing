@@ -38,8 +38,7 @@ export function listingToValues(l: Listing): Record<string, string> {
     annualTaxes: s(l.financing?.annualTaxes),
     annualInsurance: s(l.financing?.annualInsurance),
     hoaMonthly: s(l.financing?.hoaMonthly),
-    sellerCredit: s(l.concession?.amount),
-    buydown: l.concession?.type ?? "",
+    buydown: l.concession?.type ?? "none",
     showPayment: String(l.showPayment),
   };
 }

@@ -1,6 +1,6 @@
 import type { Agent, BuydownType, Concession, Financing, Listing, ListingStatus, LoanOfficer, OpenHouse, PaymentSettings } from "./types";
 import { BUYDOWN_TYPES, LISTING_STATUSES } from "./types";
-import { MAX_CONCESSION_PCT } from "./concessions";
+import { closingCostCredit } from "./concessions";
 import { slugify } from "./format";
 
 /**
@@ -78,24 +78,30 @@ export function normalizeBuydown(v: unknown): BuydownType | undefined {
 const CREDIT_KEYS = ["sellerCredit", "sellerConcession", "concession.amount", "concession"];
 
 /**
- * Seller credit from `sellerCredit` + `buydown`. A request that leaves both
- * out keeps the existing credit; an empty or zero amount removes it.
+ * Seller incentive from `buydown` (2-1, 1-0, 3-2-1, permanent, closing-costs
+ * or none). `sellerCredit` alone means a closing cost credit of that amount.
+ * A request that leaves both out keeps the existing incentive.
  */
 function parseConcession(raw: Raw, price: number | undefined, issues: string[], existing?: Concession): Concession | undefined {
   const typeKeys = ["buydown", "buydownType", "concessionType", "concession.type"];
   const present = [...CREDIT_KEYS, ...typeKeys].some((k) => k.split(".")[0] in raw);
   if (!present) return existing;
   const rawAmount = pick(raw, ...CREDIT_KEYS);
-  if (rawAmount != null && typeof rawAmount === "object") return existing;
-  const amount = num(rawAmount);
-  if (rawAmount != null && amount == null) issues.push("sellerCredit must be a dollar amount like 10000");
-  if (!amount || amount <= 0) return undefined;
+  const amount = typeof rawAmount === "object" ? undefined : num(rawAmount);
+  if (rawAmount != null && typeof rawAmount !== "object" && amount == null) issues.push("sellerCredit must be a dollar amount like 10000");
   const rawType = pick(raw, ...typeKeys);
-  const type = rawType == null ? "closing-costs" : normalizeBuydown(rawType);
-  if (!type) issues.push(`buydown must be one of ${BUYDOWN_TYPES.join(", ")}`);
-  if (price && amount > (price * MAX_CONCESSION_PCT) / 100)
-    issues.push(`sellerCredit can't be more than ${MAX_CONCESSION_PCT}% of the price; no loan type allows more`);
-  return type ? { amount: Math.round(amount), type } : undefined;
+  if (rawType == null || /^(none|no|false|0)$/i.test(String(rawType))) {
+    if (rawType != null || !amount || amount <= 0) return undefined;
+    return { amount: Math.round(amount), type: "closing-costs" };
+  }
+  const type = normalizeBuydown(rawType);
+  if (!type) {
+    issues.push(`buydown must be one of ${BUYDOWN_TYPES.join(", ")} or none`);
+    return undefined;
+  }
+  if (type === "closing-costs") return { amount: Math.round(amount && amount > 0 ? amount : closingCostCredit(price ?? 0)), type };
+  // Buydown costs are worked out per loan, so no amount is needed.
+  return { amount: 0, type };
 }
 
 function pick(raw: Raw, ...keys: string[]): unknown {
