@@ -10,12 +10,12 @@ export function ListingForm({
   slug,
   initial,
   loanOfficers,
-  uploadsEnabled,
+  uploadMode,
 }: {
   slug: string | null;
   initial: Record<string, string>;
   loanOfficers: { slug: string; name: string }[];
-  uploadsEnabled: boolean;
+  uploadMode: "token" | "presigned" | null;
 }) {
   const [state, action, pending] = useActionState<FormState, FormData>(saveListingAction.bind(null, slug), {});
   const v = state.values ?? initial;
@@ -71,7 +71,7 @@ export function ListingForm({
         <PhotoField
           name="photos"
           initial={(v.photos ?? "").split("\n").filter(Boolean)}
-          uploadsEnabled={uploadsEnabled}
+          uploadMode={uploadMode}
           folder={`listings/${slug ?? "new"}`}
         />
       </fieldset>

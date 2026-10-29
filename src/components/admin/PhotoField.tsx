@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { upload } from "@vercel/blob/client";
+import { upload, uploadPresigned } from "@vercel/blob/client";
 
 /** Resize to ≤2000px JPEG in the browser: smaller uploads, and converts WebP/HEIC-on-Safari to JPEG. */
 async function toJpeg(file: File): Promise<Blob> {
@@ -19,12 +19,12 @@ async function toJpeg(file: File): Promise<Blob> {
 export function PhotoField({
   name,
   initial,
-  uploadsEnabled,
+  uploadMode,
   folder,
 }: {
   name: string;
   initial: string[];
-  uploadsEnabled: boolean;
+  uploadMode: "token" | "presigned" | null;
   folder: string;
 }) {
   const [photos, setPhotos] = useState<string[]>(initial);
@@ -45,7 +45,7 @@ export function PhotoField({
         setStatus(`Uploading ${i + 1} of ${list.length}…`);
         const jpeg = await toJpeg(file);
         const base = file.name.replace(/\.[^.]+$/, "").replace(/[^a-z0-9-]+/gi, "-").toLowerCase() || "photo";
-        const blob = await upload(`${folder}/${base}.jpg`, jpeg, {
+        const blob = await (uploadMode === "presigned" ? uploadPresigned : upload)(`${folder}/${base}.jpg`, jpeg, {
           access: "public",
           handleUploadUrl: "/admin/upload",
           contentType: "image/jpeg",
@@ -100,7 +100,7 @@ export function PhotoField({
           Add URLs
         </button>
       </div>
-      {uploadsEnabled ? (
+      {uploadMode ? (
         <label className="upload">
           <span className="btn btn-small btn-ghost">Upload photos…</span>
           <input type="file" accept="image/*" multiple hidden onChange={(e) => onFiles(e.target.files)} />

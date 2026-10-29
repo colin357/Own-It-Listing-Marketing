@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { detections, loanOfficers } from "@/lib/store";
 import { formatPrice } from "@/lib/format";
-import { lastRun } from "@/lib/detect/run";
+import { lastRun, lastTestRun } from "@/lib/detect/run";
 import { listingProvider, photoSource } from "@/lib/detect/providers";
 import type { DetectionStatus } from "@/lib/detect/types";
 import { approveAction, dismissAction, runNowAction } from "./actions";
@@ -19,7 +19,7 @@ export default async function DetectionsPage({ searchParams }: PageProps<"/admin
   const sp = await searchParams;
   const status = typeof sp.status === "string" ? sp.status : "";
   const msg = typeof sp.msg === "string" ? sp.msg : "";
-  const [all, los, run] = await Promise.all([detections.list(), loanOfficers.list(), lastRun()]);
+  const [all, los, run, test] = await Promise.all([detections.list(), loanOfficers.list(), lastRun(), lastTestRun()]);
   const rows = all.filter((d) => (status ? d.status === status : d.status !== "dismissed"));
   const count = (s: DetectionStatus) => all.filter((d) => d.status === s).length;
   const waitingLos = [...new Set(all.filter((d) => d.status === "waiting-lo").map((d) => d.loanOfficerName))];
@@ -65,6 +65,37 @@ export default async function DetectionsPage({ searchParams }: PageProps<"/admin
               <li key={e}>{e}</li>
             ))}
           </ul>
+        </div>
+      ) : null}
+      {test && (!run || test.run.finishedAt > run.finishedAt) ? (
+        <div className="alert">
+          <strong>Last test run</strong> ({new Date(test.run.finishedAt).toLocaleString("en-US")}, nothing saved):{" "}
+          {test.run.metros} metros checked with {test.run.requests} feed requests, {test.run.listingsScanned} new listings
+          scanned, {test.detections.length} matched your roster.
+          {test.run.errors.length ? (
+            <ul>
+              {test.run.errors.slice(0, 8).map((e) => (
+                <li key={e}>{e}</li>
+              ))}
+            </ul>
+          ) : null}
+          {test.detections.length ? (
+            <ul>
+              {test.detections.map((d) => (
+                <li key={d.slug}>
+                  <strong>{d.listing.address}</strong>, {d.listing.city} ({formatPrice(d.listing.price)}): listed by{" "}
+                  {d.listing.agent.name}, matches {d.rosterAgent.name} (LO {d.loanOfficerName}),{" "}
+                  {Math.round(d.confidence * 100)}%:{" "}
+                  {d.status === "created" ? "would create the kit" : d.status === "review" ? "would ask you to review" : "waiting on the LO record"}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="small muted">
+              No roster agents listed anything in that window. That&apos;s normal on a quiet day; press Run now to save
+              results, or check back after tomorrow&apos;s run.
+            </p>
+          )}
         </div>
       ) : null}
       {waitingLos.length ? (

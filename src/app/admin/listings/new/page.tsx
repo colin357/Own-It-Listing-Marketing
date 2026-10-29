@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { loanOfficers } from "@/lib/store";
 import { ListingForm } from "@/components/admin/ListingForm";
+import { blobMode } from "@/lib/blob";
 
 export default async function NewListingPage({ searchParams }: PageProps<"/admin/listings/new">) {
   const los = await loanOfficers.list();
@@ -21,7 +22,7 @@ export default async function NewListingPage({ searchParams }: PageProps<"/admin
         slug={null}
         initial={{ loanOfficerSlug: typeof lo === "string" ? lo : los[0].slug }}
         loanOfficers={los.map(({ slug, name }) => ({ slug, name }))}
-        uploadsEnabled={!!process.env.BLOB_READ_WRITE_TOKEN}
+        uploadMode={blobMode()}
       />
     </>
   );

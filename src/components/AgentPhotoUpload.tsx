@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { upload } from "@vercel/blob/client";
+import { upload, uploadPresigned } from "@vercel/blob/client";
 import { addAgentPhotosAction } from "@/app/l/[slug]/actions";
 
 /** Resize to ≤2000px JPEG in the browser (also converts HEIC/WebP where the browser can decode it). */
@@ -18,7 +18,7 @@ async function toJpeg(file: File): Promise<Blob> {
   );
 }
 
-export function AgentPhotoUpload({ slug, enabled }: { slug: string; enabled: boolean }) {
+export function AgentPhotoUpload({ slug, mode }: { slug: string; mode: "token" | "presigned" }) {
   const router = useRouter();
   const [status, setStatus] = useState<string | null>(null);
 
@@ -29,7 +29,7 @@ export function AgentPhotoUpload({ slug, enabled }: { slug: string; enabled: boo
     try {
       for (const [i, file] of list.entries()) {
         setStatus(`Uploading ${i + 1} of ${list.length}…`);
-        const blob = await upload(`listings/${slug}/photo-${i + 1}.jpg`, await toJpeg(file), {
+        const blob = await (mode === "token" ? upload : uploadPresigned)(`listings/${slug}/photo-${i + 1}.jpg`, await toJpeg(file), {
           access: "public",
           handleUploadUrl: `/l/${slug}/photos`,
           contentType: "image/jpeg",
@@ -46,7 +46,6 @@ export function AgentPhotoUpload({ slug, enabled }: { slug: string; enabled: boo
     }
   };
 
-  if (!enabled) return null;
   return (
     <div className="photo-intake">
       <label className="pill pill-lg">

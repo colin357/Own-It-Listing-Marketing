@@ -18,6 +18,7 @@ import { ASSETS, assetsFor, isPrintAsset } from "@/lib/render/templates";
 import { CopyButton } from "@/components/CopyButton";
 import { ShareButton } from "@/components/ShareButton";
 import { AgentPhotoUpload } from "@/components/AgentPhotoUpload";
+import { blobMode } from "@/lib/blob";
 
 function assetUrl(slug: string, file: string, version: string, download = false) {
   const v = encodeURIComponent(version);
@@ -143,8 +144,8 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
                 We couldn&apos;t find photos for {streetLine(l)} yet. Add yours and every graphic and the flyer update
                 right away.
               </p>
-              {process.env.BLOB_READ_WRITE_TOKEN ? (
-                <AgentPhotoUpload slug={l.slug} enabled />
+              {blobMode() ? (
+                <AgentPhotoUpload slug={l.slug} mode={blobMode()!} />
               ) : (
                 <p className="muted">Reply to {loFirst} with your listing photos and they&apos;ll add them.</p>
               )}

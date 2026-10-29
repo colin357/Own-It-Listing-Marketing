@@ -280,7 +280,8 @@ export async function runDetection({ days = 2, dryRun = false, origin }: RunOpti
     waitingLo: results.filter((d) => d.status === "waiting-lo").length,
     errors,
   };
-  if (!dryRun) await documents.set("detection-run", run);
+  // A test run saves nothing else, so keep what it found for the admin page to show.
+  await documents.set(dryRun ? "detection-test" : "detection-run", dryRun ? { run, detections: results } : run);
   return { run, detections: results };
 }
 
@@ -319,4 +320,8 @@ export async function dismissDetection(slug: string) {
 
 export async function lastRun() {
   return documents.get<DetectionRun>("detection-run");
+}
+
+export async function lastTestRun() {
+  return documents.get<{ run: DetectionRun; detections: Detection[] }>("detection-test");
 }

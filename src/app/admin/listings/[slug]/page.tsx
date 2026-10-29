@@ -4,6 +4,7 @@ import { listingToValues } from "@/lib/formValues";
 import { streetLine } from "@/lib/format";
 import { ListingForm } from "@/components/admin/ListingForm";
 import { deleteListingAction } from "@/app/admin/actions";
+import { blobMode } from "@/lib/blob";
 
 export default async function EditListingPage({ params }: PageProps<"/admin/listings/[slug]">) {
   const { slug } = await params;
@@ -21,7 +22,7 @@ export default async function EditListingPage({ params }: PageProps<"/admin/list
         slug={slug}
         initial={listingToValues(listing)}
         loanOfficers={los.map(({ slug, name }) => ({ slug, name }))}
-        uploadsEnabled={!!process.env.BLOB_READ_WRITE_TOKEN}
+        uploadMode={blobMode()}
       />
       <form action={deleteListingAction.bind(null, slug)} className="danger-zone">
         <p className="small muted">Deleting removes the kit page. Links already sent to the agent will stop working.</p>
