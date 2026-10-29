@@ -1,5 +1,16 @@
 import type { Listing, LoanOfficer } from "./types";
 import { formatPrice } from "./format";
+import { principalAndInterest } from "./amortize";
+import {
+  activeConcession,
+  CLOSING_COST_PCT,
+  concessionDisclaimer,
+  concessionEffect,
+  type ConcessionEffect,
+  type Program as LoanProgram,
+} from "./concessions";
+
+export { principalAndInterest };
 
 /**
  * PITI scenarios for the payment-options flyer.
@@ -50,8 +61,6 @@ const FHA_HIGH_BALANCE = 726_200;
 const VA_FUNDING_FEE_PCT = 2.15;
 /** Lender fees (origination, points, etc.) assumed when estimating an APR from a published rate. */
 export const APR_FEES_PCT = 1;
-/** Buyer closing costs + prepaids, as % of price, for "cash to close" estimates. */
-const CLOSING_COST_PCT = 3;
 
 /**
  * Qualification rules of thumb per program, used for the "what it takes"
@@ -67,6 +76,7 @@ export const GUIDELINES: Record<string, { minCredit: number; maxDti: number; bes
 
 export interface Scenario {
   id: string;
+  program: LoanProgram;
   name: string;
   detail: string;
   downPct: number;
@@ -83,6 +93,8 @@ export interface Scenario {
   total: number;
   /** Estimated down payment plus closing costs. */
   cashToClose: number;
+  /** The seller concession applied to this scenario, when the listing has one. */
+  concession?: ConcessionEffect;
 }
 
 export interface PaymentOptions {
@@ -92,12 +104,6 @@ export interface PaymentOptions {
   taxesEstimated: boolean;
   insuranceEstimated: boolean;
   disclaimer: string;
-}
-
-export function principalAndInterest(loan: number, ratePct: number, years = TERM_YEARS): number {
-  const r = ratePct / 100 / 12;
-  const n = years * 12;
-  return r === 0 ? loan / n : (loan * r) / (1 - Math.pow(1 + r, -n));
 }
 
 export function estimateAnnualTaxes(price: number, state: string): number {
@@ -185,6 +191,7 @@ function conventional(i: Inputs, id: string, downPct: number): Scenario {
   const mortgageInsurance = downPct < 20 ? (loanAmount * CONV_PMI_PCT) / 100 / 12 : 0;
   return {
     id,
+    program: "conventional",
     name: "Conventional",
     detail: `${downPct}% down`,
     downPct,
@@ -213,6 +220,7 @@ function fha(i: Inputs): Scenario {
   const mortgageInsurance = (baseLoan * mipPct) / 100 / 12;
   return {
     id: "fha",
+    program: "fha",
     name: "FHA",
     detail: "3.5% down",
     downPct,
@@ -236,6 +244,7 @@ function va(i: Inputs): Scenario {
   const principalInterest = principalAndInterest(loanAmount, i.vaRatePct);
   return {
     id: "va",
+    program: "va",
     name: "VA",
     detail: "0% down",
     downPct: 0,
@@ -271,6 +280,7 @@ function buildDisclaimer(
     hasFha ? `FHA includes a ${FHA_UFMIP_PCT}% upfront MIP financed into the loan and annual MIP; FHA loans are subject to county loan limits.` : "",
     hasVa ? `VA assumes first-time use with the ${VA_FUNDING_FEE_PCT}% funding fee financed; eligibility required.` : "",
     x.i.rateNote ?? "",
+    activeConcession(l) ? concessionDisclaimer(activeConcession(l)!, scenarios.flatMap((s) => s.concession ?? [])) : "",
     ...extra,
     `Actual rates, payments and mortgage insurance vary based on credit, loan amount, occupancy and other factors. Rates subject to change without notice. Not a commitment to lend. Subject to credit approval.`,
   ]
@@ -278,11 +288,23 @@ function buildDisclaimer(
     .join(" ");
 }
 
+/**
+ * Applies the listing's seller concession: a permanent buydown lowers the
+ * rate and payment, leftover credit lowers cash to close. Temporary buydowns
+ * keep the note-rate payment (what the buyer qualifies at) and add a schedule.
+ */
+function withConcession<T extends Scenario>(l: Listing, s: T): T {
+  const c = activeConcession(l);
+  if (!c) return s;
+  const e = concessionEffect(s, l.price, c);
+  return { ...s, ratePct: e.ratePct, aprPct: e.aprPct, principalInterest: e.principalInterest, total: e.total, cashToClose: e.cashToClose, concession: e };
+}
+
 /** Returns the three PITI scenarios, or null when there's no rate or payments are hidden. */
 export function paymentOptions(l: Listing, lo: LoanOfficer): PaymentOptions | null {
   const x = inputs(l, lo);
   if (!x) return null;
-  const scenarios = [conventional(x.i, "conv-low", 5), conventional(x.i, "conv-20", 20), fha(x.i)];
+  const scenarios = [conventional(x.i, "conv-low", 5), conventional(x.i, "conv-20", 20), fha(x.i)].map((s) => withConcession(l, s));
   return {
     scenarios,
     annualTaxes: x.annualTaxes,
@@ -305,13 +327,18 @@ export interface ProgramOptions extends PaymentOptions {
   scenarios: Program[];
   /** Extra yearly income needed for every $500/mo of other debts (car, cards, student loans). */
   incomePer500Debt: number;
+  /** The disclaimer without the qualification notes, for flyers that only show payments. */
+  paymentDisclaimer: string;
+  /** What "cash to close" and the credit scores mean, for flyers that use paymentDisclaimer. */
+  cashNote: string;
 }
 
 /** Four loan programs (incl. VA) with cash to close and qualification rules of thumb. */
 export function programOptions(l: Listing, lo: LoanOfficer): ProgramOptions | null {
   const x = inputs(l, lo);
   if (!x) return null;
-  const scenarios: Program[] = [conventional(x.i, "conv-low", 5), conventional(x.i, "conv-20", 20), fha(x.i), va(x.i)].map((s) => {
+  const scenarios: Program[] = [conventional(x.i, "conv-low", 5), conventional(x.i, "conv-20", 20), fha(x.i), va(x.i)].map((base) => {
+    const s = withConcession(l, base);
     const g = GUIDELINES[s.id];
     return { ...s, ...g, incomeNeeded: (s.total * 12) / (g.maxDti / 100) };
   });
@@ -324,5 +351,7 @@ export function programOptions(l: Listing, lo: LoanOfficer): ProgramOptions | nu
     insuranceEstimated: x.insuranceEstimated,
     incomePer500Debt: (500 * 12) / (GUIDELINES["conv-low"].maxDti / 100),
     disclaimer: buildDisclaimer(l, scenarios, x, [dtiNote]),
+    paymentDisclaimer: buildDisclaimer(l, scenarios, x),
+    cashNote: `Cash to close includes the down payment and estimated closing costs and prepaids of ${CLOSING_COST_PCT}% of the price. Credit scores are typical minimums.`,
   };
 }

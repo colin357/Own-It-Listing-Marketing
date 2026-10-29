@@ -21,6 +21,9 @@ import { CopyButton } from "@/components/CopyButton";
 import { ShareButton } from "@/components/ShareButton";
 import { AgentPhotoUpload } from "@/components/AgentPhotoUpload";
 import { blobMode } from "@/lib/blob";
+import { programOptions } from "@/lib/mortgage";
+import { activeConcession, concessionTag } from "@/lib/concessions";
+import { ConcessionCalculator } from "@/components/ConcessionCalculator";
 
 function assetUrl(slug: string, file: string, version: string, download = false) {
   const v = encodeURIComponent(version);
@@ -67,6 +70,10 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
   const [wordA, wordB] = splitName(lo.name);
   const statusWords = statusLabel(l).toUpperCase().split(" ");
   const tel = lo.phone ? `tel:${lo.phone.replace(/[^\d+]/g, "")}` : null;
+  const credit = activeConcession(l);
+  // The calculator starts from the payments without any credit and applies it live.
+  const forSale = l.status !== "just-sold" && l.status !== "under-contract";
+  const basePrograms = forSale ? programOptions({ ...l, concession: undefined }, lo) : null;
 
   return (
     <div className="kit" style={{ "--accent": accent, "--on-accent": onAccent } as CSSProperties}>
@@ -80,6 +87,7 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
           )}
           <nav className="nav-links">
             <a href="#graphics">Graphics</a>
+            {basePrograms ? <a href="#seller-credit">Seller credit</a> : null}
             <a href="#captions">Captions</a>
             <a href="#emails">Emails</a>
             <a href="#contact">Contact</a>
@@ -122,6 +130,7 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
             <span className="hero-price">{formatPrice(l.price)}</span>
             {statsLine(l) ? <span>{statsLine(l)}</span> : null}
             {pay ? <span>Est. {pay.label}</span> : null}
+            {credit ? <span>{concessionTag(credit)}</span> : null}
           </p>
           {oh ? <p className="hero-oh">Open house · {oh}</p> : null}
           <div className="actions">
@@ -174,6 +183,29 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
           </div>
         </div>
       </section>
+
+      {basePrograms ? (
+        <section className="credit" id="seller-credit">
+          <div className="wrap credit-inner">
+            <div className="credit-intro">
+              <p className="eyebrow">Seller credit</p>
+              <h2 className="display display-md">
+                Offer a
+                <br />
+                buydown.
+              </h2>
+              <p className="lead">
+                Enter what the seller will put toward the buyer&apos;s costs and pick how buyers can use it. Every graphic, flyer,
+                caption and email updates to match.
+              </p>
+              <p className="muted">
+                Limits by loan type are checked for you. Questions about the right option? Ask {loFirst}.
+              </p>
+            </div>
+            <ConcessionCalculator slug={l.slug} price={l.price} scenarios={basePrograms.scenarios} initial={credit} />
+          </div>
+        </section>
+      ) : null}
 
       <section className="work" id="graphics">
         <div className="wrap">

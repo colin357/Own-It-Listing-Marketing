@@ -1,5 +1,6 @@
-import type { Agent, Financing, Listing, ListingStatus, LoanOfficer, OpenHouse, PaymentSettings } from "./types";
-import { LISTING_STATUSES } from "./types";
+import type { Agent, BuydownType, Concession, Financing, Listing, ListingStatus, LoanOfficer, OpenHouse, PaymentSettings } from "./types";
+import { BUYDOWN_TYPES, LISTING_STATUSES } from "./types";
+import { MAX_CONCESSION_PCT } from "./concessions";
 import { slugify } from "./format";
 
 /**
@@ -61,6 +62,40 @@ function url(v: unknown, field: string, issues: string[]): string | undefined {
     issues.push(`${field} must be a valid http(s) URL`);
     return undefined;
   }
+}
+
+/** "2/1", "2-1 buydown", "Closing costs" → BuydownType. */
+export function normalizeBuydown(v: unknown): BuydownType | undefined {
+  const s = String(v ?? "").toLowerCase().replace(/[/\s_]+/g, "-");
+  if (/^3-2-1/.test(s)) return "3-2-1";
+  if (/^2-1/.test(s)) return "2-1";
+  if (/^1-0/.test(s)) return "1-0";
+  if (/perm|point/.test(s)) return "permanent";
+  if (/clos|credit|cost/.test(s)) return "closing-costs";
+  return (BUYDOWN_TYPES as readonly string[]).includes(s) ? (s as BuydownType) : undefined;
+}
+
+const CREDIT_KEYS = ["sellerCredit", "sellerConcession", "concession.amount", "concession"];
+
+/**
+ * Seller credit from `sellerCredit` + `buydown`. A request that leaves both
+ * out keeps the existing credit; an empty or zero amount removes it.
+ */
+function parseConcession(raw: Raw, price: number | undefined, issues: string[], existing?: Concession): Concession | undefined {
+  const typeKeys = ["buydown", "buydownType", "concessionType", "concession.type"];
+  const present = [...CREDIT_KEYS, ...typeKeys].some((k) => k.split(".")[0] in raw);
+  if (!present) return existing;
+  const rawAmount = pick(raw, ...CREDIT_KEYS);
+  if (rawAmount != null && typeof rawAmount === "object") return existing;
+  const amount = num(rawAmount);
+  if (rawAmount != null && amount == null) issues.push("sellerCredit must be a dollar amount like 10000");
+  if (!amount || amount <= 0) return undefined;
+  const rawType = pick(raw, ...typeKeys);
+  const type = rawType == null ? "closing-costs" : normalizeBuydown(rawType);
+  if (!type) issues.push(`buydown must be one of ${BUYDOWN_TYPES.join(", ")}`);
+  if (price && amount > (price * MAX_CONCESSION_PCT) / 100)
+    issues.push(`sellerCredit can't be more than ${MAX_CONCESSION_PCT}% of the price; no loan type allows more`);
+  return type ? { amount: Math.round(amount), type } : undefined;
 }
 
 function pick(raw: Raw, ...keys: string[]): unknown {
@@ -128,6 +163,8 @@ export function parseListingInput(raw: Raw, existing?: Listing): Omit<Listing, "
     if (bad.length) issues.push(`${bad.join(", ")} must be an annual percentage like 6.5`);
   }
 
+  const concession = parseConcession(raw, num(raw.price), issues, existing?.concession);
+
   const listing = {
     slug: str(raw.slug) ? slugify(String(raw.slug)) : existing?.slug,
     loanOfficerSlug: str(pick(raw, "loanOfficerSlug", "loanOfficer")) ?? "",
@@ -152,6 +189,7 @@ export function parseListingInput(raw: Raw, existing?: Listing): Omit<Listing, "
     openHouse,
     agent,
     financing,
+    concession,
     showPayment: bool(raw.showPayment, existing?.showPayment ?? true),
     source: existing?.source,
     createdAt: existing?.createdAt ?? now,

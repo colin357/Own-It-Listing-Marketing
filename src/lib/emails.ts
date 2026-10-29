@@ -1,6 +1,7 @@
 import type { Listing, LoanOfficer } from "./types";
 import { formatOpenHouse, formatPrice, fullAddress, paymentInfo, statsLine, streetLine } from "./format";
 import { programOptions } from "./mortgage";
+import { activeConcession, concessionSentence } from "./concessions";
 
 /**
  * Ready-to-send emails for the listing agent, written in the agent's voice.
@@ -52,6 +53,8 @@ export function buildEmails(l: Listing, lo: LoanOfficer): Email[] {
   const programs = active ? programOptions(l, lo) : null;
   const link = l.listingUrl ? `See all the photos and details: ${l.listingUrl}` : null;
   const apply = lo.applyUrl ? `Get pre-approved online: ${lo.applyUrl}` : null;
+  const c = activeConcession(l);
+  const credit = c ? concessionSentence(c) : null;
   const emails: Email[] = [];
 
   // 1. Friends, family and past clients.
@@ -76,6 +79,7 @@ export function buildEmails(l: Listing, lo: LoanOfficer): Email[] {
       factsLine(l),
       l.description && active ? `\n${l.description}` : null,
       active && highlightList(l) ? `\nA few highlights:\n${highlightList(l)}` : null,
+      credit ? `\n${credit}` : null,
       active && oh ? `\nOpen house: ${oh}` : null,
       active && link ? `\n${link}` : null,
       "",
@@ -129,6 +133,7 @@ export function buildEmails(l: Listing, lo: LoanOfficer): Email[] {
         l.lotSize ? `Lot: ${l.lotSize}` : null,
         l.yearBuilt ? `Built: ${l.yearBuilt}` : null,
         highlightList(l, 4) ? `\n${highlightList(l, 4)}` : null,
+        c ? `\nSeller concession: ${formatPrice(c.amount)} (${c.type === "closing-costs" ? "closing cost credit" : c.type === "permanent" ? "permanent rate buydown" : `${c.type} buydown`}), within each loan program's limits.` : null,
         oh ? `\nOpen house: ${oh}` : null,
         link ? `\n${link}` : null,
         "",
@@ -160,6 +165,7 @@ export function buildEmails(l: Listing, lo: LoanOfficer): Email[] {
               "",
               factsLine(l),
               highlightList(l, 4) ? `\n${highlightList(l, 4)}` : null,
+              credit ? `\n${credit}` : null,
               "",
               `My lending partner ${lo.name} can answer financing questions or run numbers for you. Feel free to bring friends, and reply to let me know you're coming.`,
               "",
@@ -178,6 +184,7 @@ export function buildEmails(l: Listing, lo: LoanOfficer): Email[] {
               "",
               factsLine(l),
               highlightList(l, 4) ? `\n${highlightList(l, 4)}` : null,
+              credit ? `\n${credit}` : null,
               link ? `\n${link}` : null,
               "",
               "Want to see it in person? Reply with a couple of times that work and I'll set up a private showing.",
@@ -191,7 +198,11 @@ export function buildEmails(l: Listing, lo: LoanOfficer): Email[] {
     if (programs || pay) {
       const rows = programs?.scenarios
         .filter((s) => s.id !== "conv-20")
-        .map((s) => `• ${s.name} with ${s.detail}: about ${formatPrice(Math.round(s.total))}/mo*, ${formatPrice(Math.round(s.cashToClose))} est. cash to close`);
+        .map((s) => {
+          const y1 = s.concession?.schedule[0];
+          const year1 = y1 ? ` (${formatPrice(Math.round(y1.total))}/mo in year 1 with the ${s.concession!.type} buydown)` : "";
+          return `• ${s.name} with ${s.detail}: about ${formatPrice(Math.round(s.total))}/mo*${year1}, ${formatPrice(Math.round(s.cashToClose))} est. cash to close`;
+        });
       emails.push({
         id: "financing",
         label: "Financing spotlight",
@@ -203,6 +214,7 @@ export function buildEmails(l: Listing, lo: LoanOfficer): Email[] {
           `If you've been wondering what it would actually cost to own ${street}, my lending partner ${lo.name} and I ran some numbers.`,
           "",
           `List price: ${formatPrice(l.price)}`,
+          credit,
           rows?.length ? `\n${rows.join("\n")}` : pay ? `\nEstimated principal and interest: ${pay.label}` : null,
           "",
           "A lot of buyers are surprised to learn they don't need 20% down. The best first step is a quick pre-approval, so you know your budget before you fall in love with a home.",
@@ -232,6 +244,7 @@ export function buildEmails(l: Listing, lo: LoanOfficer): Email[] {
         "",
         factsLine(l),
         highlightList(l, 4) ? `\n${highlightList(l, 4)}` : null,
+        credit ? `\n${credit}` : null,
         oh ? `\nOpen house: ${oh}` : null,
         link ? `\n${link}` : null,
         "",

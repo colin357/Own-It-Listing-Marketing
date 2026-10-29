@@ -15,6 +15,7 @@ import {
   streetLine,
 } from "../format";
 import { paymentOptions, type PaymentOptions, type ProgramOptions } from "../mortgage";
+import { activeConcession, concessionSentence, concessionTag } from "../concessions";
 
 /**
  * Satori templates (rendered to PNG by next/og). Satori supports a subset of
@@ -30,13 +31,14 @@ import { paymentOptions, type PaymentOptions, type ProgramOptions } from "../mor
  */
 
 /** Bump when templates change so cached PNGs/PDFs are re-rendered. */
-export const TEMPLATE_VERSION = "2";
+export const TEMPLATE_VERSION = "3";
 
 /** Cache key for a listing's graphics: changes with the templates, the listing and the rates shown. */
 export function assetVersion(l: Listing): string {
   const f = l.financing;
   const rates = f && l.showPayment ? [f.ratePct, f.aprPct, f.fhaRatePct, f.vaRatePct].join("_") : "none";
-  return `${TEMPLATE_VERSION}-${l.updatedAt}-${rates}`;
+  const credit = l.concession ? `${l.concession.amount}${l.concession.type}` : "0";
+  return `${TEMPLATE_VERSION}-${l.updatedAt}-${rates}-${credit}`;
 }
 
 export interface RenderData {
@@ -197,7 +199,7 @@ function Person({
  * agent's listing post.
  */
 function showsLo(d: RenderData): boolean {
-  return paymentInfo(d.listing, d.lo) != null;
+  return paymentInfo(d.listing, d.lo) != null || activeConcession(d.listing) != null;
 }
 
 /**
@@ -233,7 +235,10 @@ function loPerson(d: RenderData, size: number, color: string, subColor: string, 
 function Compliance({ d, size, color }: { d: RenderData; size: number; color: string }) {
   if (!showsLo(d)) return null;
   const pay = paymentInfo(d.listing, d.lo);
-  const text = [complianceLine(d.lo), pay?.disclaimer, d.lo.disclaimer].filter(Boolean).join("  ");
+  const credit = activeConcession(d.listing)
+    ? "Seller concession subject to loan program limits, the purchase contract and lender approval."
+    : null;
+  const text = [complianceLine(d.lo), pay?.disclaimer, credit, d.lo.disclaimer].filter(Boolean).join("  ");
   return <div style={{ display: "flex", ...body(size, color), lineHeight: 1.3 }}>{text}</div>;
 }
 
@@ -292,6 +297,12 @@ function openHousePill(d: RenderData, size: number) {
   return oh ? <Pill text={`Open House · ${oh}`} bg={d.accent} color={d.onAccent} size={size} /> : null;
 }
 
+/** "Seller-paid 2-1 buydown" pill, when the agent has added a seller credit. */
+function creditPill(d: RenderData, size: number, bg = d.accent, color = d.onAccent) {
+  const c = activeConcession(d.listing);
+  return c ? <Pill text={concessionTag(c)} bg={bg} color={color} size={size} /> : null;
+}
+
 function payLabel(d: RenderData) {
   const pay = paymentInfo(d.listing, d.lo);
   return pay ? `Est. ${pay.label}` : null;
@@ -317,7 +328,10 @@ export function SquarePost(d: RenderData) {
         />
         <div style={{ position: "absolute", top: 52, left: 56, right: 56, display: "flex", flexDirection: "column", gap: 22 }}>
           <Headline l={l} width={760} max={150} color="#fff" />
-          <div style={{ display: "flex" }}>{openHousePill(d, 20)}</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+            {openHousePill(d, 20)}
+            {creditPill(d, 20, "#fff", INK)}
+          </div>
         </div>
         <div style={{ position: "absolute", left: 56, right: 56, bottom: 44, display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 20 }}>
@@ -369,7 +383,10 @@ export function StoryPost(d: RenderData) {
         </div>
         <div style={{ display: "flex", ...label(28, INK, 900) }}>{`${streetLine(l)} · ${cityLine(l)}`}</div>
         <StatsInline l={l} size={38} color={INK} dim={MUTED} />
-        <div style={{ display: "flex" }}>{openHousePill(d, 22)}</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+          {openHousePill(d, 22)}
+          {creditPill(d, 22, INK, "#fff")}
+        </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 20, marginTop: "auto" }}>
           <div style={{ display: "flex", height: 2, background: LINE }} />
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -398,6 +415,7 @@ export function LandscapePost(d: RenderData) {
         <div style={{ display: "flex", ...label(17, INK, 900) }}>{streetLine(l)}</div>
         <div style={{ display: "flex", ...label(14, MUTED) }}>{cityLine(l)}</div>
         <StatsInline l={l} size={26} color={INK} dim={MUTED} />
+        {activeConcession(l) ? <div style={{ display: "flex" }}>{creditPill(d, 12, INK, "#fff")}</div> : null}
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: "auto" }}>
           <div style={{ display: "flex", gap: 22 }}>
             <Person
@@ -442,7 +460,10 @@ export function DetailsPost(d: RenderData) {
           style={{ ...fill, display: "flex", backgroundImage: "linear-gradient(180deg, rgba(10,10,10,0.55) 0%, rgba(10,10,10,0) 30%)" }}
         />
         <div style={{ position: "absolute", top: 44, left: 56, right: 56, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <Pill text={statusLabel(l)} bg="#fff" color={INK} size={20} />
+          <div style={{ display: "flex", gap: 12 }}>
+            <Pill text={statusLabel(l)} bg="#fff" color={INK} size={20} />
+            {creditPill(d, 20)}
+          </div>
           <div style={{ display: "flex", ...label(20, "#fff") }}>{`${l.city}, ${l.state}`}</div>
         </div>
       </div>
@@ -558,6 +579,7 @@ export function Flyer(d: RenderData) {
           <div style={{ display: "flex", ...label(16, d.onAccent) }}>Offered at</div>
           <div style={{ display: "flex", ...head(58, d.onAccent) }}>{formatPrice(l.price)}</div>
           {pay ? <div style={{ display: "flex", ...label(15, d.onAccent) }}>{pay}</div> : null}
+          {activeConcession(l) ? <div style={{ display: "flex", marginTop: 6 }}>{creditPill(d, 12, "#fff", INK)}</div> : null}
           <div style={{ display: "flex", gap: 16, marginTop: "auto" }}>
             {qrs.map((q) => (
               <div key={q.label} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
@@ -672,6 +694,11 @@ export function PaymentsFlyer(d: RenderData) {
                     <div style={{ display: "flex", ...label(16, MUTED) }}>/mo</div>
                   </div>
                   <div style={{ display: "flex", ...body(17, INK, 500) }}>{`${money(s.downPayment)} down payment`}</div>
+                  {s.concession?.schedule.length ? (
+                    <div style={{ display: "flex", ...body(15, INK, 700) }}>{`${money(s.concession.schedule[0].total)}/mo in year 1 with ${s.concession.type} buydown`}</div>
+                  ) : s.concession?.rateCut ? (
+                    <div style={{ display: "flex", ...body(15, INK, 700) }}>{`Was ${money(s.concession.before.total)}/mo before seller buydown`}</div>
+                  ) : null}
                 </div>
                 <div style={{ display: "flex", flexDirection: "column" }}>
                   {rows.map(([name, value]) => (
@@ -709,9 +736,9 @@ const money = (n: number) => formatPrice(Math.round(n));
 const roughMoney = (n: number, to = 100) => formatPrice(Math.round(n / to) * to);
 
 /** Photo with a dark shade on the left, a kicker, a two-line headline and the address. */
-function FinanceHero({ d, kicker, lines, height }: { d: RenderData; kicker: string; lines: string[]; height: number }) {
+function FinanceHero({ d, kicker, lines, height, max = 110 }: { d: RenderData; kicker: string; lines: string[]; height: number; max?: number }) {
   const l = d.listing;
-  const size = Math.min(...lines.map((t) => fit(t, 1000, 110)));
+  const size = Math.min(...lines.map((t) => fit(t, 1000, max)));
   return (
     <div style={{ display: "flex", height, position: "relative" }}>
       <Photo src={d.photos[0]} style={{ ...fill, width: "100%", height: "100%" }} />
@@ -786,9 +813,13 @@ export function WaysToBuyFlyer(d: RenderData) {
   const opts = d.programs;
   if (!opts) return <div style={{ display: "flex" }} />;
   const width = (1275 - 120 - 22) / 2;
+  // A seller credit adds a row to each card and to the disclaimer, so the hero gives up some room.
+  const credit = activeConcession(d.listing) != null;
   return (
     <div style={{ display: "flex", flexDirection: "column", width: "100%", height: "100%", background: "#fff" }}>
-      <FinanceHero d={d} kicker="Financing options" lines={[`${opts.scenarios.length} ways to buy`, "this home."]} height={400} />
+      <FinanceHero d={d} kicker="Financing options" lines={credit ? [`${opts.scenarios.length} ways to buy this home.`] : [`${opts.scenarios.length} ways to buy`, "this home."]}
+        height={credit ? 270 : 400}
+      />
       <div style={{ display: "flex", height: 8, background: d.accent }} />
       <div style={{ display: "flex", flexWrap: "wrap", gap: 22, padding: "34px 60px 0" }}>
         {opts.scenarios.map((s) => {
@@ -798,6 +829,8 @@ export function WaysToBuyFlyer(d: RenderData) {
             ["Mortgage insurance", s.mortgageInsurance > 0 ? `${money(s.mortgageInsurance)}/mo` : "None"],
             ["Typical min. credit score", `${s.minCredit}+`],
           ];
+          if (s.concession?.schedule.length) rows.splice(2, 0, [`Year 1 with ${s.concession.type} buydown`, `${money(s.concession.schedule[0].total)}/mo`]);
+          else if (s.concession?.toClosing) rows.splice(2, 0, ["Seller credit to closing", `−${money(s.concession.toClosing)}`]);
           return (
             <div key={s.id} style={{ display: "flex", flexDirection: "column", width, border: `2px solid ${LINE}` }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: PAPER, padding: "18px 24px" }}>
@@ -816,7 +849,7 @@ export function WaysToBuyFlyer(d: RenderData) {
                   {rows.map(([name, value]) => (
                     <div
                       key={name}
-                      style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderTop: `1.5px solid ${LINE}`, ...body(17, INK) }}
+                      style={{ display: "flex", justifyContent: "space-between", padding: credit ? "8px 0" : "10px 0", borderTop: `1.5px solid ${LINE}`, ...body(17, INK) }}
                     >
                       <div style={{ display: "flex", color: MUTED }}>{name}</div>
                       <div style={{ display: "flex", fontWeight: 600 }}>{value}</div>
@@ -833,7 +866,7 @@ export function WaysToBuyFlyer(d: RenderData) {
         })}
       </div>
       <LoBlock d={d} kicker="Not sure which fits? Let's find out" />
-      <ListedByFooter d={d} disclaimer={opts.disclaimer} />
+      <ListedByFooter d={d} disclaimer={credit ? `${opts.paymentDisclaimer} ${opts.cashNote}` : opts.disclaimer} />
     </div>
   );
 }
@@ -852,7 +885,7 @@ export function QualifyFlyer(d: RenderData) {
   ];
   return (
     <div style={{ display: "flex", flexDirection: "column", width: "100%", height: "100%", background: "#fff" }}>
-      <FinanceHero d={d} kicker="Buyer guide" lines={["What it takes", "to buy this home."]} height={400} />
+      <FinanceHero d={d} kicker="Buyer guide" lines={["What it takes", "to buy this home."]} height={activeConcession(l) ? 340 : 400} />
       <div style={{ display: "flex", height: 8, background: d.accent }} />
       <div style={{ display: "flex", flexDirection: "column", padding: "30px 60px 0", gap: 18 }}>
         <div style={{ display: "flex", flexDirection: "column", border: `2px solid ${LINE}` }}>
@@ -912,6 +945,95 @@ export function QualifyFlyer(d: RenderData) {
   );
 }
 
+/** 1275×1650 — "Seller-paid buydown" flyer: what the seller's credit does on each loan. */
+export function BuydownFlyer(d: RenderData) {
+  const c = activeConcession(d.listing);
+  const opts = d.programs;
+  if (!c || !opts) return <div style={{ display: "flex" }} />;
+  const width = (1275 - 120 - 22) / 2;
+  const lines =
+    c.type === "closing-costs" ? [`${money(c.amount)} toward`, "closing costs."] : ["Seller-paid", `${c.type === "permanent" ? "rate" : c.type} buydown.`];
+  const best = Math.max(...opts.scenarios.map((s) => s.concession?.monthlySavings ?? 0));
+  return (
+    <div style={{ display: "flex", flexDirection: "column", width: "100%", height: "100%", background: "#fff" }}>
+      <FinanceHero d={d} kicker="Seller incentive" lines={lines} height={c.type === "closing-costs" ? 400 : 360} max={96} />
+      <div style={{ display: "flex", height: 8, background: d.accent }} />
+      <div style={{ display: "flex", alignItems: "center", gap: 40, padding: "30px 60px 0" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, flexShrink: 0 }}>
+          <div style={{ display: "flex", ...label(14, MUTED) }}>{c.type === "closing-costs" ? "Seller credit" : `Saves up to ${money(best)}/mo`}</div>
+          <div style={{ display: "flex", ...head(64, INK), lineHeight: 1 }}>{money(c.amount)}</div>
+        </div>
+        <div style={{ display: "flex", ...body(20, INK) }}>{`${concessionSentence(c)} Here's what it means on each loan.*`}</div>
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 22, padding: "26px 60px 0" }}>
+        {opts.scenarios.map((s) => {
+          const e = s.concession;
+          if (!e) return null;
+          let big: [string, string];
+          let rows: [string, string][];
+          if (e.schedule.length) {
+            big = [money(e.schedule[0].total), "/mo in year 1*"];
+            rows = e.schedule.map((y) => [`${y.label} · ${y.ratePct}%`, `${money(y.total)}/mo`]);
+          } else if (e.rateCut > 0) {
+            big = [money(e.total), "/mo for 30 years*"];
+            rows = [
+              ["Rate", `${e.before.ratePct}% → ${e.ratePct}%`],
+              ["Monthly savings", `${money(e.monthlySavings)}/mo`],
+              ["Discount points paid by seller", `${e.points}`],
+            ];
+          } else {
+            big = [money(e.cashToClose), "est. cash to close*"];
+            rows = [
+              ["Before the credit", money(e.before.cashToClose)],
+              ["Seller credit to closing costs", `−${money(e.toClosing)}`],
+            ];
+          }
+          const notes: string[] = [];
+          if (e.type !== "closing-costs" && !e.schedule.length && !e.rateCut)
+            notes.push(e.buydownCost ? `Covers closing costs instead; the full buydown needs ${money(e.buydownCost)}` : "Covers closing costs instead");
+          else if (e.toClosing > 0 && e.type !== "closing-costs") notes.push(`Plus ${money(e.toClosing)} toward closing costs`);
+          if (e.capped) notes.push(`${s.name} limit is ${e.rule.pct}%${e.rule.of === "loan" ? " of the loan" : ""}, so the credit is ${money(e.credit)}`);
+          return (
+            <div key={s.id} style={{ display: "flex", flexDirection: "column", width, border: `2px solid ${LINE}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: PAPER, padding: "16px 24px" }}>
+                <div style={{ display: "flex", ...label(20, INK, 900) }}>{s.name}</div>
+                <div style={{ display: "flex", ...label(16, MUTED) }}>{s.detail}</div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", padding: "16px 24px 18px", gap: 10 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                    <div style={{ display: "flex", ...head(52, INK), lineHeight: 1 }}>{big[0]}</div>
+                    <div style={{ display: "flex", ...label(14, MUTED) }}>{big[1]}</div>
+                  </div>
+                  <div style={{ display: "flex", ...label(12, MUTED) }}>
+                    {`Note rate ${e.before.ratePct}%${e.before.aprPct ? ` · ${e.before.aprPct}% APR` : ""}${e.rateCut ? ` · now ${e.ratePct}%${e.aprPct ? ` · ${e.aprPct}% APR` : ""}` : ""}`}
+                  </div>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column" }}>
+                  {rows.map(([name, value]) => (
+                    <div key={name} style={{ display: "flex", justifyContent: "space-between", padding: "9px 0", borderTop: `1.5px solid ${LINE}`, ...body(17, INK) }}>
+                      <div style={{ display: "flex", color: MUTED }}>{name}</div>
+                      <div style={{ display: "flex", fontWeight: 600 }}>{value}</div>
+                    </div>
+                  ))}
+                </div>
+                {notes.map((n) => (
+                  <div key={n} style={{ display: "flex", alignItems: "center", gap: 10, ...body(14, INK, 600) }}>
+                    <div style={{ display: "flex", width: 7, height: 7, borderRadius: 7, background: INK, flexShrink: 0 }} />
+                    {n}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <LoBlock d={d} kicker="Ask how the seller credit works for you" />
+      <ListedByFooter d={d} disclaimer={opts.paymentDisclaimer} />
+    </div>
+  );
+}
+
 export interface AssetDef {
   label: string;
   use: string;
@@ -923,6 +1045,8 @@ export interface AssetDef {
   print?: boolean;
   /** Only available when the listing has a rate (see paymentOptions). */
   needsPayments?: boolean;
+  /** Only available when the agent has added a seller credit. */
+  needsConcession?: boolean;
 }
 
 export const ASSETS = {
@@ -931,6 +1055,17 @@ export const ASSETS = {
   story: { label: "Story", use: "Stories · Reels cover", size: "1080 × 1920", width: 1080, height: 1920, render: StoryPost },
   landscape: { label: "Link post", use: "Facebook · LinkedIn", size: "1200 × 630", width: 1200, height: 630, render: LandscapePost },
   flyer: { label: "Flyer", use: "Print · 8.5 × 11", size: "1275 × 1650", width: 1275, height: 1650, render: Flyer, print: true },
+  buydown: {
+    label: "Seller credit flyer",
+    use: "Print · 8.5 × 11",
+    size: "1275 × 1650",
+    width: 1275,
+    height: 1650,
+    render: BuydownFlyer,
+    print: true,
+    needsPayments: true,
+    needsConcession: true,
+  },
   payments: {
     label: "Payment options flyer",
     use: "Print · 8.5 × 11",
@@ -980,6 +1115,6 @@ export function assetsFor(l: Listing, lo: LoanOfficer): AssetName[] {
   const hasPayments = l.status !== "just-sold" && paymentOptions(l, lo) != null;
   return (Object.keys(ASSETS) as AssetName[]).filter((name) => {
     const a: AssetDef = ASSETS[name];
-    return !a.needsPayments || hasPayments;
+    return (!a.needsPayments || hasPayments) && (!a.needsConcession || activeConcession(l) != null);
   });
 }

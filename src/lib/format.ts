@@ -1,5 +1,6 @@
 import type { Listing, LoanOfficer, PaymentSettings } from "./types";
 import { LISTING_STATUSES } from "./types";
+import { activeConcession, concessionEffect } from "./concessions";
 
 export function slugify(input: string): string {
   return input
@@ -80,12 +81,29 @@ export function paymentInfo(l: Listing, lo: LoanOfficer) {
     downPaymentPct: lo.payment?.downPaymentPct ?? 20,
     termYears: lo.payment?.termYears ?? 30,
   };
-  const monthly = monthlyPayment(l.price, settings);
-  const apr = l.financing?.ratePct != null ? l.financing.aprPct : lo.payment?.aprPct;
+  let monthly = monthlyPayment(l.price, settings);
+  let apr = l.financing?.ratePct != null ? l.financing.aprPct : lo.payment?.aprPct;
+  // A seller-paid permanent buydown lowers the advertised rate; temporary buydowns don't.
+  let buydownNote = "";
+  const c = activeConcession(l);
+  if (c?.type === "permanent" && settings.termYears === 30) {
+    const loanAmount = l.price * (1 - settings.downPaymentPct / 100);
+    const e = concessionEffect(
+      { program: "conventional", downPct: settings.downPaymentPct, loanAmount, ratePct, aprPct: apr, principalInterest: monthly, total: monthly, cashToClose: 0 },
+      l.price,
+      c,
+    );
+    if (e.rateCut > 0) {
+      buydownNote = ` Reflects a seller-paid permanent buydown of ${e.points} discount points from ${ratePct}%.`;
+      settings.ratePct = e.ratePct;
+      monthly = e.principalInterest;
+      apr = e.aprPct;
+    }
+  }
   return {
     monthly,
     label: `${formatPrice(monthly)}/mo*`,
-    disclaimer: `*Est. principal & interest only on a ${settings.termYears}-yr fixed loan at ${ratePct}% interest${apr ? ` (${apr}% APR)` : ""} with ${settings.downPaymentPct}% down. Excludes taxes, insurance, HOA and PMI.${l.financing?.ratePct != null && l.financing.rateNote ? ` ${l.financing.rateNote}` : ""} Rates subject to change. Not a commitment to lend.`,
+    disclaimer: `*Est. principal & interest only on a ${settings.termYears}-yr fixed loan at ${settings.ratePct}% interest${apr ? ` (${apr}% APR)` : ""} with ${settings.downPaymentPct}% down.${buydownNote} Excludes taxes, insurance, HOA and PMI.${l.financing?.ratePct != null && l.financing.rateNote ? ` ${l.financing.rateNote}` : ""} Rates subject to change. Not a commitment to lend.`,
   };
 }
 

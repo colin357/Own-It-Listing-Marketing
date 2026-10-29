@@ -9,6 +9,17 @@ export const LISTING_STATUSES = {
 
 export type ListingStatus = keyof typeof LISTING_STATUSES;
 
+/** How buyers can use a seller concession (see src/lib/concessions.ts). */
+export const BUYDOWN_TYPES = ["2-1", "1-0", "3-2-1", "permanent", "closing-costs"] as const;
+
+export type BuydownType = (typeof BUYDOWN_TYPES)[number];
+
+/** Seller concession the agent is offering, in dollars, and how buyers can use it. */
+export interface Concession {
+  amount: number;
+  type: BuydownType;
+}
+
 export interface PaymentSettings {
   /** Annual interest rate, e.g. 6.75 */
   ratePct: number;
@@ -123,6 +134,8 @@ export interface Listing {
   openHouse?: OpenHouse;
   agent: Agent;
   financing?: Financing;
+  /** Seller credit offered on the listing, set by the agent on the kit page. */
+  concession?: Concession;
   /** Show payment estimates on this listing's materials. */
   showPayment: boolean;
   /** Set on listings created by new-listing detection. */

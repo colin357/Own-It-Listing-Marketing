@@ -8,6 +8,7 @@ import {
   statsLine,
   streetLine,
 } from "./format";
+import { activeConcession, concessionSentence } from "./concessions";
 
 export interface Caption {
   id: string;
@@ -70,6 +71,12 @@ function financingLine(l: Listing, lo: LoanOfficer): string | null {
     : `💰 Financing questions? ${who} (NMLS #${lo.nmls}) can get you pre-approved fast.`;
 }
 
+/** "🎁 The seller is offering $10,000 toward a 2-1 rate buydown…" */
+function creditLine(l: Listing): string | null {
+  const c = activeConcession(l);
+  return c ? `🎁 ${concessionSentence(c)} Ask me how it works!` : null;
+}
+
 export function buildCaptions(l: Listing, lo: LoanOfficer): Caption[] {
   const headline = HEADLINES[l.status];
   const stats = statsLine(l, " | ");
@@ -77,6 +84,8 @@ export function buildCaptions(l: Listing, lo: LoanOfficer): Caption[] {
   const fin = financingLine(l, lo);
   const highlights = l.highlights.slice(0, 4).map((h) => `✔️ ${h}`).join("\n");
   const pay = paymentInfo(l, lo);
+  const credit = creditLine(l);
+  const c = activeConcession(l);
 
   const instagram = [
     `${headline} 📍 ${streetLine(l)}, ${l.city}`,
@@ -84,6 +93,7 @@ export function buildCaptions(l: Listing, lo: LoanOfficer): Caption[] {
     `${formatPrice(l.price)}${stats ? ` | ${stats}` : ""}`,
     oh ? `\n🗓️ ${oh}` : null,
     highlights ? `\n${highlights}` : null,
+    credit ? `\n${credit}` : null,
     "",
     callToAction(l),
     fin ? `\n${fin}` : null,
@@ -100,6 +110,7 @@ export function buildCaptions(l: Listing, lo: LoanOfficer): Caption[] {
     l.description ?? `Don't miss this ${stats.toLowerCase() || "home"} in ${l.city}, offered at ${formatPrice(l.price)}.`,
     oh ? `\nJoin us for an open house ${oh}.` : null,
     highlights ? `\n${highlights}` : null,
+    credit ? `\n${credit}` : null,
     l.listingUrl ? `\nFull details & photos: ${l.listingUrl}` : null,
     "",
     callToAction(l),
@@ -125,6 +136,7 @@ export function buildCaptions(l: Listing, lo: LoanOfficer): Caption[] {
   const text = [
     `${headline.replace(/^\S+\s/, "")}: ${streetLine(l)}, ${cityLine(l)} — ${formatPrice(l.price)}${stats ? ` (${stats})` : ""}.`,
     oh ? `Open house ${oh}.` : null,
+    c ? concessionSentence(c) : null,
     l.listingUrl ? `Details: ${l.listingUrl}` : null,
     l.status !== "just-sold" ? `Want to see it? Reply and I'll set up a showing!` : null,
   ]

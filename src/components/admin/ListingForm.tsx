@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { saveListingAction, type FormState } from "@/app/admin/actions";
 import { LISTING_STATUSES } from "@/lib/types";
+import { BUYDOWNS } from "@/lib/concessions";
 import { Field, FormErrors, TextInput } from "./Field";
 import { PhotoField } from "./PhotoField";
 
@@ -111,6 +112,16 @@ export function ListingForm({
           <TextInput label="Annual property taxes" name="annualTaxes" values={v} inputMode="numeric" placeholder="Estimate" />
           <TextInput label="Annual insurance" name="annualInsurance" values={v} inputMode="numeric" placeholder="Estimate" />
           <TextInput label="HOA / month" name="hoaMonthly" values={v} inputMode="numeric" />
+          <TextInput label="Seller credit $" name="sellerCredit" values={v} inputMode="numeric" placeholder="None" />
+          <Field label="Seller credit use">
+            <select name="buydown" defaultValue={v.buydown || "2-1"}>
+              {Object.entries(BUYDOWNS).map(([k, b]) => (
+                <option key={k} value={k}>
+                  {b.label}
+                </option>
+              ))}
+            </select>
+          </Field>
         </div>
       </fieldset>
 
