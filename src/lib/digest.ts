@@ -25,6 +25,18 @@ function agentMessage(l: Listing, kitUrl: string): string {
   return `Hi${who ? ` ${who}` : ""}, congrats on ${streetLine(l)}! I put together a free marketing kit for it: social posts, flyers, captions and emails, all ready to download. ${kitUrl}`;
 }
 
+/**
+ * Table-cell "bulletproof" button: the cell carries the color, so it still
+ * reads as a button in Outlook, Gmail and apps that ignore styles on links.
+ */
+function button(href: string, label: string, primary: boolean): string {
+  const bg = primary ? "#0a0a0a" : "#ffffff";
+  const fg = primary ? "#ffffff" : "#0a0a0a";
+  return `<td bgcolor="${bg}" style="background:${bg};border:2px solid #0a0a0a;border-radius:6px">
+        <a href="${esc(href)}" target="_blank" style="display:block;padding:11px 20px;color:${fg};font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:700;text-decoration:none">${label}</a>
+      </td>`;
+}
+
 function kitCard(l: Listing, origin: string): string {
   const kitUrl = `${origin}/l/${l.slug}`;
   const facts = [formatPrice(l.price), statsLine(l)].filter(Boolean).join(" · ");
@@ -43,11 +55,11 @@ function kitCard(l: Listing, origin: string): string {
     <p style="margin:4px 0 0;font-size:14px;color:#5b5b5b">${esc(facts)}</p>
     <p style="margin:10px 0 0;font-size:14px;color:#0a0a0a">Listed by <strong>${esc(agent)}</strong>${l.agent.phone ? ` · ${esc(l.agent.phone)}` : ""}${l.agent.email ? ` · ${esc(l.agent.email)}` : ""}</p>
     ${noPhotos}
-    <p style="margin:16px 0 0">
-      <a href="${esc(kitUrl)}" style="display:inline-block;background:#0a0a0a;color:#ffffff;text-decoration:none;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:11px 20px;border-radius:999px">Open kit</a>
-      &nbsp;
-      <a href="${esc(`${kitUrl}/download`)}" style="display:inline-block;color:#0a0a0a;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:11px 8px">Download all</a>
-    </p>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:16px 0 0"><tr>
+      ${button(kitUrl, "Open kit", true)}
+      <td width="10" style="font-size:0;line-height:0">&nbsp;</td>
+      ${button(`${kitUrl}/download`, "Download all", false)}
+    </tr></table>
     <p style="margin:16px 0 4px;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#5b5b5b">Text or email to ${esc(firstName(l.agent.name) ?? "the agent")}</p>
     <p style="margin:0;padding:12px 14px;background:#f4f3f1;font-size:14px;line-height:1.5;color:#0a0a0a">${esc(agentMessage(l, kitUrl))}</p>
   </td></tr>
