@@ -124,9 +124,12 @@ export async function sendDigests(origin: string): Promise<{ sent: number; error
   for (const d of digests) {
     const mail: Mail = { to: [d.lo.email!], subject: d.subject, html: d.html };
     const failed = await sendMail([mail]);
+    // A timeout usually means Microsoft took the message but answered slowly, so
+    // count it as sent rather than risk a duplicate on the next run.
+    const timedOut = failed.length > 0 && failed.every((e) => /timeout|aborted/i.test(e));
     if (failed.length) {
-      errors.push(...failed);
-      continue;
+      errors.push(...failed.map((e) => (timedOut ? `${e} (counted as sent; check Sent Items)` : e)));
+      if (!timedOut) continue;
     }
     sent++;
     const now = new Date().toISOString();
