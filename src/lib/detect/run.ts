@@ -10,6 +10,7 @@ import type { Detection, DetectionRun, SourceListing } from "./types";
 import { refreshMarketRates } from "../rates";
 import { sendDigests } from "../digest";
 import { indexListings } from "./mls";
+import { phoneDigits } from "../contact";
 
 /** Loan officer record for a roster/metro name, matched on first + last name. */
 function loFinder(los: LoanOfficer[]) {
@@ -61,6 +62,8 @@ export async function createKitFromDetection(det: Detection, lo: LoanOfficer): P
     agent: {
       name: s.agent.name,
       phone: s.agent.phone ?? det.rosterAgent.phone,
+      // MLS data often repeats the office number as the agent's phone.
+      phoneIsOffice: !!s.agent.phone && !!s.office?.phone && phoneDigits(s.agent.phone) === phoneDigits(s.office.phone),
       email: s.agent.email ?? det.rosterAgent.email,
       brokerage: s.office?.name ?? det.rosterAgent.brokerage,
       headshotUrl: det.rosterAgent.headshotUrl,

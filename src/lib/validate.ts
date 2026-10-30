@@ -130,6 +130,7 @@ export function parseListingInput(raw: Raw, existing?: Listing): Omit<Listing, "
   const agent: Agent = {
     name: str(pick(raw, "agentName", "agent.name")) ?? "",
     phone: str(pick(raw, "agentPhone", "agent.phone")),
+    phoneIsOffice: bool(pick(raw, "agentPhoneIsOffice", "agent.phoneIsOffice"), false) || undefined,
     email: str(pick(raw, "agentEmail", "agent.email")),
     brokerage: str(pick(raw, "agentBrokerage", "brokerage", "agent.brokerage")),
     license: str(pick(raw, "agentLicense", "agent.license")),

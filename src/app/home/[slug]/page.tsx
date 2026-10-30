@@ -15,6 +15,7 @@ import {
 import { programOptions } from "@/lib/mortgage";
 import { activeConcession, concessionSentence } from "@/lib/concessions";
 import { PhotoGallery } from "@/components/PhotoGallery";
+import { tourContact } from "@/lib/contact";
 import "./buyer.css";
 
 /**
@@ -56,12 +57,10 @@ export default async function BuyerPage({ params }: PageProps<"/home/[slug]">) {
   const credit = activeConcession(l);
   const oh = forSale ? formatOpenHouse(l) : null;
 
-  // One button: call the agent. Falls back to email when there's no phone on file.
-  const tel = agent.phone ? `tel:${agent.phone.replace(/[^\d+]/g, "")}` : null;
-  const mail = agent.email
-    ? `mailto:${agent.email}?subject=${encodeURIComponent(`Tour of ${streetLine(l)}`)}`
-    : null;
-  const contactHref = tel ?? mail;
+  // One button: the agent's own phone, else their office line, else email (see lib/contact.ts).
+  const tour = tourContact(agent, `Tour of ${streetLine(l)}`);
+  const contactHref = tour?.href ?? null;
+  const mail = agent.email ? `mailto:${agent.email}?subject=${encodeURIComponent(`Tour of ${streetLine(l)}`)}` : null;
   const contactLabel = forSale ? "Schedule a tour" : `Contact ${agentFirst ?? "the agent"}`;
 
   const facts = [
@@ -227,18 +226,20 @@ export default async function BuyerPage({ params }: PageProps<"/home/[slug]">) {
                 {contactLabel}
               </a>
             ) : null}
-            <p className="bp-links">
-              {agent.phone && tel ? (
-                <a className="textlink" href={tel}>
-                  {agent.phone}
-                </a>
+            <div className="bp-contact">
+              {agent.phone && tour?.kind !== "email" ? (
+                <p>
+                  <span className="muted">{tour?.kind === "office" ? agent.brokerage ? `${agent.brokerage} office` : "Office" : "Call or text"}</span>
+                  <a href={tour!.href}>{agent.phone}</a>
+                </p>
               ) : null}
-              {agent.email ? (
-                <a className="textlink" href={`mailto:${agent.email}`}>
-                  Email
-                </a>
+              {agent.email && mail ? (
+                <p>
+                  <span className="muted">Email {agentFirst ?? "the agent"}</span>
+                  <a href={mail}>{agent.email}</a>
+                </p>
               ) : null}
-            </p>
+            </div>
           </div>
         </aside>
       </div>

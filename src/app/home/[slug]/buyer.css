@@ -87,3 +87,9 @@
   }
   .bp-dock .pill { width: 100%; }
 }
+
+/* Agent phone / email under the tour button, labelled so buyers know whose they are. */
+.bp-contact { display: grid; gap: 10px; }
+.bp-contact p { display: grid; gap: 1px; font-size: 0.92rem; }
+.bp-contact .muted { font-size: 0.78rem; }
+.bp-contact a { font-weight: 600; overflow-wrap: anywhere; }
