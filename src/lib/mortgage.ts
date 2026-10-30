@@ -64,14 +64,22 @@ export const APR_FEES_PCT = 1;
 
 /**
  * Qualification rules of thumb per program, used for the "what it takes"
- * flyer. Debt-to-income is the guideline most borrowers are approved at, not
- * the absolute maximum an automated approval may allow.
+ * flyer. maxDti is a debt-to-income ratio lenders commonly approve through
+ * automated underwriting, kept below each program's ceiling so the income
+ * shown is realistic rather than a best case:
+ * - Conventional: Fannie Mae DU / Freddie Mac LPA allow up to 50%; 45% is the
+ *   manual-underwriting limit and a safe everyday figure.
+ * - FHA: automated approvals go up to about 56.9%; 50% is the manual limit
+ *   with compensating factors.
+ * - VA: no maximum. 41% is only a benchmark above which the lender documents
+ *   residual income, and approvals at 50% or more are routine, so using 41%
+ *   made VA buyers look like they need more income than conventional buyers.
  */
 export const GUIDELINES: Record<string, { minCredit: number; maxDti: number; bestFor: string }> = {
   "conv-low": { minCredit: 620, maxDti: 45, bestFor: "Good credit and some savings" },
   "conv-20": { minCredit: 620, maxDti: 45, bestFor: "No mortgage insurance, lowest payment" },
-  fha: { minCredit: 580, maxDti: 43, bestFor: "Lower credit scores and smaller savings" },
-  va: { minCredit: 620, maxDti: 41, bestFor: "Eligible veterans and service members" },
+  fha: { minCredit: 580, maxDti: 50, bestFor: "Lower credit scores and smaller savings" },
+  va: { minCredit: 620, maxDti: 50, bestFor: "Eligible veterans and service members" },
 };
 
 export interface Scenario {
@@ -325,7 +333,7 @@ export interface Program extends Scenario {
 
 export interface ProgramOptions extends PaymentOptions {
   scenarios: Program[];
-  /** Extra yearly income needed for every $500/mo of other debts (car, cards, student loans). */
+  /** Extra yearly income needed for every $500/mo of other debts (car, cards, student loans), at the strictest DTI shown. */
   incomePer500Debt: number;
   /** The disclaimer without the qualification notes, for flyers that only show payments. */
   paymentDisclaimer: string;
@@ -342,14 +350,22 @@ export function programOptions(l: Listing, lo: LoanOfficer): ProgramOptions | nu
     const g = GUIDELINES[s.id];
     return { ...s, ...g, incomeNeeded: (s.total * 12) / (g.maxDti / 100) };
   });
-  const dtiNote = `Income needed is gross household income at a debt-to-income ratio of ${scenarios.map((s) => `${s.maxDti}% (${s.name} ${s.detail})`).join(", ")}, assuming no other monthly debts. Credit scores are typical minimums; requirements vary by lender and borrower. Cash to close includes the down payment and estimated closing costs and prepaids of ${CLOSING_COST_PCT}% of the price.`;
+  // Group programs sharing a ratio: "45% for Conventional and 50% for FHA and VA".
+  const byDti = new Map<number, string[]>();
+  for (const s of scenarios) {
+    const names = byDti.get(s.maxDti) ?? [];
+    if (!names.includes(s.name)) names.push(s.name);
+    byDti.set(s.maxDti, names);
+  }
+  const ratios = [...byDti].map(([dti, names]) => `${dti}% for ${names.join(" and ")}`).join(" and ");
+  const dtiNote = `Income needed is gross household income at a debt-to-income ratio of ${ratios}, assuming no other monthly debts; VA also requires residual income. Credit scores are typical minimums; requirements vary by lender and borrower. Cash to close includes the down payment and estimated closing costs and prepaids of ${CLOSING_COST_PCT}% of the price.`;
   return {
     scenarios,
     annualTaxes: x.annualTaxes,
     annualInsurance: x.annualInsurance,
     taxesEstimated: x.taxesEstimated,
     insuranceEstimated: x.insuranceEstimated,
-    incomePer500Debt: (500 * 12) / (GUIDELINES["conv-low"].maxDti / 100),
+    incomePer500Debt: (500 * 12) / (Math.min(...scenarios.map((s) => s.maxDti)) / 100),
     disclaimer: buildDisclaimer(l, scenarios, x, [dtiNote]),
     paymentDisclaimer: buildDisclaimer(l, scenarios, x),
     cashNote: `Cash to close includes the down payment and estimated closing costs and prepaids of ${CLOSING_COST_PCT}% of the price. Credit scores are typical minimums.`,

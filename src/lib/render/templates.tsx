@@ -31,7 +31,7 @@ import { activeConcession, concessionSentence, concessionTag } from "../concessi
  */
 
 /** Bump when templates change so cached PNGs/PDFs are re-rendered. */
-export const TEMPLATE_VERSION = "4";
+export const TEMPLATE_VERSION = "5";
 
 /** Cache key for a listing's graphics: changes with the templates, the listing and the rates shown. */
 export function assetVersion(l: Listing): string {
