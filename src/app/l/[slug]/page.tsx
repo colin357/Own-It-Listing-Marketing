@@ -26,6 +26,8 @@ import { activeConcession, concessionTag } from "@/lib/concessions";
 import { ConcessionCalculator } from "@/components/ConcessionCalculator";
 import { GraphicsTabs } from "@/components/GraphicsTabs";
 import { buyerPagePath, siteUrl } from "@/lib/site";
+import { tourContact } from "@/lib/contact";
+import { AgentContactForm } from "@/components/AgentContactForm";
 
 function assetUrl(slug: string, file: string, version: string, download = false) {
   const v = encodeURIComponent(version);
@@ -62,6 +64,15 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
   const { listing: l, lo } = kit;
   const { accent, onAccent } = brandColors(lo);
   const buyerUrl = (await siteUrl()) + buyerPagePath(l.slug);
+  const tour = tourContact(l.agent, "");
+  const tourSummary =
+    tour?.kind === "cell"
+      ? `Schedule a tour calls you at ${l.agent.phone}.`
+      : tour?.kind === "office"
+        ? `Schedule a tour calls ${l.agent.phone}, which looks like your office line. Add your cell so tour calls come to you.`
+        : tour?.kind === "email"
+          ? `Schedule a tour emails you at ${l.agent.email}. Add your cell so buyers can call you.`
+          : "We don't have your phone yet, so the buyer page has no tour button. Add your cell.";
   const captions = buildCaptions(l, lo, buyerUrl);
   const emails = buildEmails(l, lo, buyerUrl);
   const pay = paymentInfo(l, lo);
@@ -232,6 +243,7 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
                 A page for this home to text or email to buyers: photos, details, payments and a button to call you for a
                 tour. The flyer QR code, captions and emails already link to it.
               </p>
+              <AgentContactForm slug={l.slug} summary={tourSummary} needsCell={tour?.kind !== "cell"} />
               <div className="actions">
                 <CopyButton text={buyerUrl} label="Copy link" className="pill" />
                 <a className="textlink" href={buyerPagePath(l.slug)} target="_blank" rel="noreferrer">

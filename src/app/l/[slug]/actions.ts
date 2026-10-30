@@ -7,6 +7,7 @@ import { offerAmount } from "@/lib/concessions";
 import { getKit } from "@/lib/listings";
 import { programOptions } from "@/lib/mortgage";
 import type { Concession } from "@/lib/types";
+import { phoneDigits } from "@/lib/contact";
 
 const MAX_AGENT_PHOTOS = 30;
 
@@ -48,5 +49,29 @@ export async function saveConcessionAction(slug: string, type: string): Promise<
   }
   await listings.save({ ...listing, concession, updatedAt: new Date().toISOString() });
   revalidatePath(`/l/${slug}`);
+  return {};
+}
+
+/**
+ * Saves where the buyer page's "Schedule a tour" button goes: the agent's own
+ * phone and email. A blank field keeps what's there.
+ */
+export async function saveAgentContactAction(slug: string, phone: string, email: string): Promise<{ error?: string }> {
+  const listing = await listings.get(slug);
+  if (!listing) return { error: "Listing not found" };
+  const p = phone.trim();
+  const e = email.trim();
+  if (p && phoneDigits(p).length !== 10) return { error: "Enter a 10-digit phone number." };
+  if (e && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return { error: "Enter a valid email." };
+  if (!p && !e) return { error: "Enter your cell or email." };
+  const agent = { ...listing.agent };
+  if (p) {
+    agent.phone = p;
+    delete agent.phoneIsOffice;
+  }
+  if (e) agent.email = e;
+  await listings.save({ ...listing, agent, updatedAt: new Date().toISOString() });
+  revalidatePath(`/l/${slug}`);
+  revalidatePath(`/home/${slug}`);
   return {};
 }

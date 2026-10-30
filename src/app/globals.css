@@ -331,3 +331,6 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent);
 /* ---------- kit: buyer page link ---------- */
 .buyer-link { display: grid; gap: 10px; }
 .buyer-link .actions { margin-top: 6px; }
+.tour-contact { display: grid; gap: 10px; margin-top: 6px; }
+.tour-form { display: flex; flex-wrap: wrap; gap: 8px; }
+.tour-form input { flex: 1 1 180px; width: auto; }

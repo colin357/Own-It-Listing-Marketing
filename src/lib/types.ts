@@ -62,6 +62,8 @@ export interface LoanOfficer {
 export interface Agent {
   name: string;
   phone?: string;
+  /** The phone is the brokerage's line (the MLS gave the office number for the agent). */
+  phoneIsOffice?: boolean;
   email?: string;
   brokerage?: string;
   license?: string;
