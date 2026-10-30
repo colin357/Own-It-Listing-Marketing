@@ -16,7 +16,7 @@ import {
   statusLabel,
   streetLine,
 } from "@/lib/format";
-import { ASSETS, assetsFor, assetVersion, isPrintAsset } from "@/lib/render/templates";
+import { ASSETS, assetsFor, assetVersion, isPrintAsset, type AssetName } from "@/lib/render/templates";
 import { CopyButton } from "@/components/CopyButton";
 import { ShareButton } from "@/components/ShareButton";
 import { AgentPhotoUpload } from "@/components/AgentPhotoUpload";
@@ -24,6 +24,7 @@ import { blobMode } from "@/lib/blob";
 import { programOptions } from "@/lib/mortgage";
 import { activeConcession, concessionTag } from "@/lib/concessions";
 import { ConcessionCalculator } from "@/components/ConcessionCalculator";
+import { GraphicsTabs } from "@/components/GraphicsTabs";
 
 function assetUrl(slug: string, file: string, version: string, download = false) {
   const v = encodeURIComponent(version);
@@ -74,6 +75,43 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
   // The calculator starts from the payments without any credit and applies it live.
   const forSale = l.status !== "just-sold" && l.status !== "under-contract";
   const basePrograms = forSale ? programOptions({ ...l, concession: undefined }, lo) : null;
+
+  // Most-used first: feed posts, then stories and link posts; the listing flyer leads the print set.
+  const social = order.filter((name) => !isPrintAsset(name));
+  const flyers = order.filter((name) => isPrintAsset(name));
+  const card = (name: AssetName) => {
+    const a = ASSETS[name];
+    const file = `${name}.png`;
+    return (
+      <article key={name} className={`card card-${name}`}>
+        <a href={assetUrl(l.slug, file, v)} target="_blank" rel="noreferrer" className="card-img">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={assetUrl(l.slug, file, v)}
+            alt={`${a.label} for ${streetLine(l)}`}
+            width={a.width}
+            height={a.height}
+            loading="lazy"
+          />
+        </a>
+        <div className="card-meta">
+          <p className="label">{a.label}</p>
+          <p className="card-use">{a.use}</p>
+          <div className="card-links">
+            {isPrintAsset(name) ? (
+              <a className="textlink" href={assetUrl(l.slug, `${name}.pdf`, v, true)}>
+                PDF
+              </a>
+            ) : null}
+            <a className="textlink" href={assetUrl(l.slug, file, v, true)}>
+              PNG
+            </a>
+            <ShareButton url={assetUrl(l.slug, file, v)} filename={`${l.slug}-${file}`} text={captions[0].text} />
+          </div>
+        </div>
+      </article>
+    );
+  };
 
   return (
     <div className="kit" style={{ "--accent": accent, "--on-accent": onAccent } as CSSProperties}>
@@ -208,55 +246,36 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
       <section className="work" id="graphics">
         <div className="wrap">
           <div className="work-head">
-            <div>
-              <p className="lead">Tap a graphic to see it full size. On your phone, use Share to post straight to Instagram or Facebook.</p>
-              <a className="pill" href={`/l/${l.slug}/download`}>
-                Download all (.zip)
-              </a>
-            </div>
             <h2 className="display display-lg">
               Ready
               <br />
               to post.
             </h2>
+            <div>
+              <p className="lead">Tap a graphic to see it full size.</p>
+              <a className="pill" href={`/l/${l.slug}/download`}>
+                Download all (.zip)
+              </a>
+            </div>
           </div>
-          <div className="cards">
-            {order.map((name) => {
-              const a = ASSETS[name];
-              const file = `${name}.png`;
-              return (
-                <article key={name} className={`card card-${name}`}>
-                  <a href={assetUrl(l.slug, file, v)} target="_blank" rel="noreferrer" className="card-img">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={assetUrl(l.slug, file, v)}
-                      alt={`${a.label} for ${streetLine(l)}`}
-                      width={a.width}
-                      height={a.height}
-                      loading="lazy"
-                    />
-                  </a>
-                  <div className="card-meta">
-                    <p className="label">{a.label}</p>
-                    <p className="card-use">
-                      {a.use} · {a.size}
-                    </p>
-                    <div className="card-links">
-                      <a className="textlink" href={assetUrl(l.slug, file, v, true)}>
-                        PNG
-                      </a>
-                      {isPrintAsset(name) ? (
-                        <a className="textlink" href={assetUrl(l.slug, `${name}.pdf`, v, true)}>
-                          PDF
-                        </a>
-                      ) : null}
-                      <ShareButton url={assetUrl(l.slug, file, v)} filename={`${l.slug}-${file}`} text={captions[0].text} />
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
+          <GraphicsTabs
+            tabs={[
+              {
+                id: "social",
+                label: "Social posts",
+                note: "Sized for Instagram, Facebook and LinkedIn. On your phone, tap Share to post straight from here.",
+                names: social,
+              },
+              {
+                id: "flyers",
+                label: "Flyers",
+                note: "Print-ready 8.5 × 11. Grab the PDF for the printer, or the PNG to text or email.",
+                names: flyers,
+              },
+            ]
+              .filter((t) => t.names.length)
+              .map(({ names, ...t }) => ({ ...t, count: names.length, content: <div className="cards">{names.map(card)}</div> }))}
+          />
         </div>
       </section>
 

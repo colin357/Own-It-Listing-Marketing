@@ -108,16 +108,27 @@ code { font-size: 0.88em; background: var(--paper); border: 1px solid var(--line
 .intro .lead { margin-bottom: 14px; }
 
 .work { background: var(--paper); padding: clamp(64px, 9vw, 110px) 0; }
-.work-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 32px; margin-bottom: 44px; }
-.work-head > div { max-width: 420px; }
-.work-head .lead { margin-bottom: 20px; }
-.work-head .display { text-align: right; }
-.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px 24px; align-items: start; }
-.card-img { display: block; background: var(--white); border: 1px solid var(--line); overflow: hidden; }
-.card-img img { width: 100%; height: auto; transition: transform 0.35s ease; }
+.work-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 32px; margin-bottom: 40px; }
+.work-head > div { max-width: 360px; text-align: right; }
+.work-head .lead { margin-bottom: 16px; }
+.gtabs-bar { display: flex; align-items: center; gap: 12px 24px; flex-wrap: wrap; padding-bottom: 22px; margin-bottom: 28px; border-bottom: 1px solid var(--line); }
+.gtabs-list { display: inline-flex; gap: 4px; padding: 4px; background: var(--white); border: 1px solid var(--line); border-radius: 999px; }
+.gtab {
+  display: inline-flex; align-items: center; gap: 10px; border: 0; background: transparent; color: var(--ink); cursor: pointer;
+  font-family: var(--display); font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; font-size: 0.78rem;
+  padding: 10px 18px; border-radius: 999px; transition: background 0.15s ease, color 0.15s ease;
+}
+.gtab:hover { background: var(--paper); }
+.gtab[aria-selected="true"] { background: var(--ink); color: var(--white); }
+.gtab-count { font-size: 0.7rem; letter-spacing: 0; opacity: 0.55; }
+.gtabs-note { font-size: 0.88rem; max-width: 520px; }
+/* Every graphic sits in the same 4:5 frame so mixed sizes line up in tidy rows. */
+.cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 32px 24px; align-items: start; }
+.card-img { display: flex; align-items: center; justify-content: center; aspect-ratio: 4 / 5; padding: 14px; background: var(--white); border: 1px solid var(--line); overflow: hidden; }
+.card-img img { width: auto; height: auto; max-width: 100%; max-height: 100%; box-shadow: 0 1px 3px rgba(10,10,10,0.08); transition: transform 0.35s ease; }
 .card-img:hover img { transform: scale(1.03); }
 .card-meta { padding-top: 14px; }
-.card-use { color: var(--muted); font-size: 0.82rem; margin: 4px 0 12px; }
+.card-use { color: var(--muted); font-size: 0.82rem; margin: 2px 0 10px; }
 .card-links { display: flex; gap: 16px; flex-wrap: wrap; }
 
 .dark { background: var(--ink); color: var(--white); padding: clamp(64px, 9vw, 110px) 0; }
@@ -175,15 +186,17 @@ details[open] .row-hint::after { content: " −"; }
   .nav-links { display: none; }
   .wordmark { font-size: 1.25rem; }
   .intro-inner, .dark-inner { grid-template-columns: 1fr; gap: 28px; }
-  .work-head { flex-direction: column-reverse; align-items: flex-start; }
-  .work-head .display { text-align: left; }
-  .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .work-head { flex-direction: column; align-items: flex-start; gap: 20px; }
+  .work-head > div { text-align: left; }
+  .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 14px; }
+  .card-img { padding: 8px; }
   .chip { top: 16px; }
   .partner-card { flex-direction: column; align-items: flex-start; }
   .foot-cols { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 420px) {
-  .cards { grid-template-columns: 1fr; }
+  .gtabs-list { width: 100%; }
+  .gtab { flex: 1; justify-content: center; padding: 10px 12px; }
 }
 
 .landing { padding: 120px var(--gutter); max-width: 760px; }
