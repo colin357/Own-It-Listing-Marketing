@@ -49,8 +49,9 @@ const DEFAULT_INSURANCE_PER_300K = 2400;
 const DWELLING_SHARE = 0.8;
 
 const TERM_YEARS = 30;
-/** Conventional PMI, annual % of loan, for a 95% LTV borrower with good credit. */
-const CONV_PMI_PCT = 0.55;
+/** Conventional PMI, annual % of loan, for a borrower with good credit: up to 90% LTV, and above 90%. */
+const CONV_PMI_PCT = 0.4;
+const CONV_PMI_HIGH_LTV_PCT = 0.55;
 /** FHA: 1.75% upfront MIP financed into the loan, 0.55% annual MIP (30-yr, LTV > 95%). */
 const FHA_UFMIP_PCT = 1.75;
 const FHA_ANNUAL_MIP_PCT = 0.55;
@@ -196,7 +197,8 @@ function conventional(i: Inputs, id: string, downPct: number): Scenario {
   const downPayment = i.price * (downPct / 100);
   const loanAmount = i.price - downPayment;
   const principalInterest = principalAndInterest(loanAmount, i.ratePct);
-  const mortgageInsurance = downPct < 20 ? (loanAmount * CONV_PMI_PCT) / 100 / 12 : 0;
+  const pmiPct = downPct < 10 ? CONV_PMI_HIGH_LTV_PCT : CONV_PMI_PCT;
+  const mortgageInsurance = downPct < 20 ? (loanAmount * pmiPct) / 100 / 12 : 0;
   return {
     id,
     program: "conventional",
@@ -312,7 +314,7 @@ function withConcession<T extends Scenario>(l: Listing, s: T): T {
 export function paymentOptions(l: Listing, lo: LoanOfficer): PaymentOptions | null {
   const x = inputs(l, lo);
   if (!x) return null;
-  const scenarios = [conventional(x.i, "conv-low", 5), conventional(x.i, "conv-20", 20), fha(x.i)].map((s) => withConcession(l, s));
+  const scenarios = [conventional(x.i, "conv-low", 10), conventional(x.i, "conv-20", 20), fha(x.i)].map((s) => withConcession(l, s));
   return {
     scenarios,
     annualTaxes: x.annualTaxes,
@@ -345,7 +347,7 @@ export interface ProgramOptions extends PaymentOptions {
 export function programOptions(l: Listing, lo: LoanOfficer): ProgramOptions | null {
   const x = inputs(l, lo);
   if (!x) return null;
-  const scenarios: Program[] = [conventional(x.i, "conv-low", 5), conventional(x.i, "conv-20", 20), fha(x.i), va(x.i)].map((base) => {
+  const scenarios: Program[] = [conventional(x.i, "conv-low", 10), conventional(x.i, "conv-20", 20), fha(x.i), va(x.i)].map((base) => {
     const s = withConcession(l, base);
     const g = GUIDELINES[s.id];
     return { ...s, ...g, incomeNeeded: (s.total * 12) / (g.maxDti / 100) };

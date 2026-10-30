@@ -101,7 +101,7 @@ export function ListingForm({
       <fieldset>
         <legend>Financing</legend>
         <p className="field-hint">
-          The rate powers the payment-options flyer (Conventional 5% down, Conventional 20% down, FHA 3.5% down). Leave
+          The rate powers the payment-options flyer (Conventional 10% down, Conventional 20% down, FHA 3.5% down). Leave
           taxes and insurance blank to estimate them from state averages.
         </p>
         <div className="grid">
