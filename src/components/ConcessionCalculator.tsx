@@ -39,13 +39,22 @@ export function ConcessionCalculator({
 
   // A one-line teaser per option, from the best loan it's available on.
   const teasers = useMemo(() => {
-    const out = {} as Record<BuydownType, string>;
+    const out = {} as Record<BuydownType, { cost: string; saves: string }>;
     for (const t of BUYDOWN_TYPES) {
       const ok = effectsFor(t).filter(({ e }) => e.available);
-      if (!ok.length) out[t] = "";
-      else if (t === "closing-costs") out[t] = `${money(ok[0].e.toClosing)} toward closing`;
-      else if (t === "permanent") out[t] = `Saves up to ${money(Math.max(...ok.map(({ e }) => e.monthlySavings)))}/mo`;
-      else out[t] = `Saves up to ${money(Math.max(...ok.map(({ e }) => e.monthlySavings)))}/mo in year 1`;
+      if (!ok.length) {
+        out[t] = { cost: "", saves: "" };
+        continue;
+      }
+      // What it costs the seller, as a range across the loans it's offered on.
+      const credits = ok.map(({ e }) => e.credit);
+      const lo = Math.min(...credits);
+      const hi = Math.max(...credits);
+      const cost = `Costs ${Math.round(lo / 100) === Math.round(hi / 100) ? money(hi) : `${money(lo)}–${money(hi)}`}`;
+      const best = money(Math.max(...ok.map(({ e }) => e.monthlySavings)));
+      const saves =
+        t === "closing-costs" ? "Less cash needed to close" : t === "permanent" ? `Saves up to ${best}/mo` : `Saves up to ${best}/mo in year 1`;
+      out[t] = { cost, saves };
     }
     return out;
   }, [scenarios, price]); // effectsFor only reads these
@@ -86,7 +95,8 @@ export function ConcessionCalculator({
             >
               <strong>{BUYDOWNS[t].label}</strong>
               <span>{BUYDOWNS[t].blurb}</span>
-              {teasers[t] ? <em>{teasers[t]}</em> : null}
+              {teasers[t].cost ? <em>{teasers[t].cost}</em> : null}
+              {teasers[t].saves ? <small>{teasers[t].saves}</small> : null}
             </button>
           ))}
           <button
