@@ -1,5 +1,6 @@
 import { zipSync, strToU8 } from "fflate";
 import { getKit } from "@/lib/listings";
+import { buyerPagePath, originFromRequest } from "@/lib/site";
 import { buildCaptions } from "@/lib/captions";
 import { buildEmails } from "@/lib/emails";
 import { assetFilename, renderAssets } from "@/lib/render/render";
@@ -9,14 +10,15 @@ import { ASSETS, assetsFor, isPrintAsset } from "@/lib/render/templates";
 export const maxDuration = 60;
 
 /** Everything in one ZIP: all PNGs, the flyer PDFs, captions.txt and emails.txt. */
-export async function GET(_req: Request, ctx: RouteContext<"/l/[slug]/download">) {
+export async function GET(req: Request, ctx: RouteContext<"/l/[slug]/download">) {
   const { slug } = await ctx.params;
   const kit = await getKit(slug);
   if (!kit) return new Response("Not found", { status: 404 });
   const { listing, lo } = kit;
 
+  const buyerUrl = originFromRequest(req) + buyerPagePath(listing.slug);
   const names = assetsFor(listing, lo);
-  const images = await renderAssets(listing, lo, names);
+  const images = await renderAssets(listing, lo, names, buyerUrl);
   const files: Record<string, Uint8Array> = {};
   for (const [i, res] of images.entries()) {
     const buf = new Uint8Array(await res.arrayBuffer());
@@ -25,11 +27,11 @@ export async function GET(_req: Request, ctx: RouteContext<"/l/[slug]/download">
       files[`${listing.slug}-${names[i]}.pdf`] = await pngToLetterPdf(buf, `${ASSETS[names[i]].label} – ${listing.address}`);
     }
   }
-  const captions = buildCaptions(listing, lo)
+  const captions = buildCaptions(listing, lo, buyerUrl)
     .map((c) => `===== ${c.label.toUpperCase()} =====\n\n${c.text}\n`)
     .join("\n");
   files["captions.txt"] = strToU8(captions);
-  const emails = buildEmails(listing, lo)
+  const emails = buildEmails(listing, lo, buyerUrl)
     .map((e) => `===== ${e.label.toUpperCase()} (${e.audience}) =====\n\nSubject: ${e.subject}\n\n${e.body}\n`)
     .join("\n");
   files["emails.txt"] = strToU8(emails);

@@ -313,3 +313,7 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent);
   .credit-intro { position: static; }
   .calc-results li { grid-template-columns: 1fr; gap: 4px; }
 }
+
+/* ---------- kit: buyer page link ---------- */
+.buyer-link { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--line); display: grid; gap: 10px; }
+.buyer-link .actions { margin-top: 6px; }

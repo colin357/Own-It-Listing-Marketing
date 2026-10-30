@@ -25,6 +25,7 @@ import { programOptions } from "@/lib/mortgage";
 import { activeConcession, concessionTag } from "@/lib/concessions";
 import { ConcessionCalculator } from "@/components/ConcessionCalculator";
 import { GraphicsTabs } from "@/components/GraphicsTabs";
+import { buyerPagePath, siteUrl } from "@/lib/site";
 
 function assetUrl(slug: string, file: string, version: string, download = false) {
   const v = encodeURIComponent(version);
@@ -60,8 +61,9 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
   if (!kit) notFound();
   const { listing: l, lo } = kit;
   const { accent, onAccent } = brandColors(lo);
-  const captions = buildCaptions(l, lo);
-  const emails = buildEmails(l, lo);
+  const buyerUrl = (await siteUrl()) + buyerPagePath(l.slug);
+  const captions = buildCaptions(l, lo, buyerUrl);
+  const emails = buildEmails(l, lo, buyerUrl);
   const pay = paymentInfo(l, lo);
   const oh = formatOpenHouse(l);
   const v = assetVersion(l);
@@ -125,6 +127,7 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
           )}
           <nav className="nav-links">
             <a href="#graphics">Graphics</a>
+            <a href="#buyer-page">Buyer page</a>
             {basePrograms ? <a href="#seller-credit">Seller incentive</a> : null}
             <a href="#captions">Captions</a>
             <a href="#emails">Emails</a>
@@ -218,6 +221,19 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
               {streetLine(l)}. Everything is sized for each platform and already includes the compliance language.
             </p>
             <p className="muted">Download, post, done. Need a tweak? Just reply to {loFirst}.</p>
+            <div className="buyer-link" id="buyer-page">
+              <p className="label">Your buyer page</p>
+              <p className="muted">
+                A page for this home to text or email to buyers: photos, details, payments and a button to call you for a
+                tour. The flyer QR code, captions and emails already link to it.
+              </p>
+              <div className="actions">
+                <CopyButton text={buyerUrl} label="Copy link" className="pill" />
+                <a className="textlink" href={buyerPagePath(l.slug)} target="_blank" rel="noreferrer">
+                  Open it
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       </section>

@@ -13,3 +13,8 @@ export function originFromRequest(req: Request): string {
   if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "");
   return new URL(req.url).origin;
 }
+
+/** The public page an agent sends to buyers (photos, details, payments, a call button). */
+export function buyerPagePath(slug: string): string {
+  return `/home/${slug}`;
+}

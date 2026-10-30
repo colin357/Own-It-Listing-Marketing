@@ -77,7 +77,8 @@ function creditLine(l: Listing): string | null {
   return c ? `🎁 ${concessionSentence(c)} Ask me how it works!` : null;
 }
 
-export function buildCaptions(l: Listing, lo: LoanOfficer): Caption[] {
+/** `link` is where buyers see the home: the buyer page, or the MLS / Zillow link. */
+export function buildCaptions(l: Listing, lo: LoanOfficer, link = l.listingUrl): Caption[] {
   const headline = HEADLINES[l.status];
   const stats = statsLine(l, " | ");
   const oh = formatOpenHouse(l);
@@ -111,7 +112,7 @@ export function buildCaptions(l: Listing, lo: LoanOfficer): Caption[] {
     oh ? `\nJoin us for an open house ${oh}.` : null,
     highlights ? `\n${highlights}` : null,
     credit ? `\n${credit}` : null,
-    l.listingUrl ? `\nFull details & photos: ${l.listingUrl}` : null,
+    link ? `\nFull details & photos: ${link}` : null,
     "",
     callToAction(l),
     fin ? `\n${fin}` : null,
@@ -128,7 +129,7 @@ export function buildCaptions(l: Listing, lo: LoanOfficer): Caption[] {
     l.status === "just-sold"
       ? `Proud to have helped make this one happen in partnership with ${lo.name} of ${lo.company}. If you or someone you know is thinking about a move, I'd love to help.`
       : `Proud to partner with ${lo.name} of ${lo.company} on financing for this listing. If you know someone looking in ${l.city}, I'd appreciate the introduction.`,
-    l.listingUrl ? `\n${l.listingUrl}` : null,
+    link ? `\n${link}` : null,
   ]
     .filter((x) => x != null)
     .join("\n");
@@ -137,7 +138,7 @@ export function buildCaptions(l: Listing, lo: LoanOfficer): Caption[] {
     `${headline.replace(/^\S+\s/, "")}: ${streetLine(l)}, ${cityLine(l)} — ${formatPrice(l.price)}${stats ? ` (${stats})` : ""}.`,
     oh ? `Open house ${oh}.` : null,
     c ? concessionSentence(c) : null,
-    l.listingUrl ? `Details: ${l.listingUrl}` : null,
+    link ? `Details: ${link}` : null,
     l.status !== "just-sold" ? `Want to see it? Reply and I'll set up a showing!` : null,
   ]
     .filter(Boolean)
