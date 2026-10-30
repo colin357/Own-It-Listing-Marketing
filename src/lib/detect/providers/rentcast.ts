@@ -117,3 +117,23 @@ export function rentcastProvider(apiKey: string): ListingProvider {
     },
   };
 }
+
+/**
+ * Sale listings at one address ("123 Main St, Austin, TX 78704"), newest
+ * first. One request, for building a kit when the MLS # isn't indexed yet.
+ */
+export async function rentcastByAddress(apiKey: string, address: string): Promise<SourceListing[]> {
+  const params = new URLSearchParams({ address, limit: "5" });
+  const res = await fetch(`${BASE}?${params}`, {
+    headers: { "X-Api-Key": apiKey, Accept: "application/json" },
+    cache: "no-store",
+  });
+  // RentCast answers 404 when nothing is listed at the address.
+  if (res.status === 404) return [];
+  if (!res.ok) throw new Error(`RentCast ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  const rows = (await res.json()) as RentcastListing[];
+  return rows
+    .sort((a, b) => Number(b.status === "Active") - Number(a.status === "Active"))
+    .map(fromRentcast)
+    .filter((l): l is SourceListing => !!l);
+}

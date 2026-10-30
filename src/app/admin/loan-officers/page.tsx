@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { listings, loanOfficers } from "@/lib/store";
+import { buildPath } from "@/lib/loLinks";
+import { siteUrl } from "@/lib/site";
+import { CopyButton } from "@/components/CopyButton";
 
 export default async function LoanOfficersPage() {
-  const [los, all] = await Promise.all([loanOfficers.list(), listings.list()]);
+  const [los, all, origin] = await Promise.all([loanOfficers.list(), listings.list(), siteUrl()]);
   const counts = new Map<string, number>();
   for (const l of all) counts.set(l.loanOfficerSlug, (counts.get(l.loanOfficerSlug) ?? 0) + 1);
 
@@ -39,6 +42,13 @@ export default async function LoanOfficersPage() {
                 <Link className="btn btn-small btn-ghost" href={`/admin/listings/new?lo=${lo.slug}`}>
                   + Listing
                 </Link>
+                {buildPath(lo.slug) ? (
+                  <CopyButton
+                    text={`${origin}${buildPath(lo.slug)}`}
+                    label="Copy kit builder link"
+                    className="btn btn-small btn-ghost"
+                  />
+                ) : null}
               </div>
             </div>
           </article>

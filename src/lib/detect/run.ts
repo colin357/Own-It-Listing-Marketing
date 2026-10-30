@@ -9,6 +9,7 @@ import { listingProvider, lookupPhotos, photoSource, type PhotoResult } from "./
 import type { Detection, DetectionRun, SourceListing } from "./types";
 import { refreshMarketRates } from "../rates";
 import { sendDigests } from "../digest";
+import { indexListings } from "./mls";
 
 /** Loan officer record for a roster/metro name, matched on first + last name. */
 function loFinder(los: LoanOfficer[]) {
@@ -150,6 +151,7 @@ export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin
     }
   }
   const seen = new Set<string>();
+  const scannedListings: SourceListing[] = [];
   const found: { listing: SourceListing; match: Match; slug: string }[] = [];
   let requests = 0;
   let scanned = 0;
@@ -163,6 +165,7 @@ export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin
         if (seen.has(l.id)) continue;
         seen.add(l.id);
         scanned++;
+        scannedListings.push(l);
         const m = match(l);
         if (!m) continue;
         const slug = slugify(`${l.provider}-${l.id}`);
@@ -172,6 +175,13 @@ export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin
     } catch (err) {
       errors.push((err as Error).message);
     }
+  }
+
+  // Remember everything we saw so loan officers can build a kit from any MLS # (src/app/build).
+  try {
+    await indexListings(scannedListings);
+  } catch (err) {
+    errors.push(`MLS index update failed: ${(err as Error).message}`);
   }
 
   // Photos only for matches, which keeps scraping to a handful of homes a day.
