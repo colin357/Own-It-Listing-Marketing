@@ -85,7 +85,7 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
     const a = ASSETS[name];
     const file = `${name}.png`;
     return (
-      <article key={name} className={`card card-${name}`}>
+      <article key={name} className={`card card-${name}`} style={{ "--ratio": a.width / a.height } as CSSProperties}>
         <a href={assetUrl(l.slug, file, v)} target="_blank" rel="noreferrer" className="card-img">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -226,11 +226,6 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
             {agentFirst}.
           </h2>
           <div>
-            <p className="lead">
-              {loFirst} put together a full set of co-branded graphics, a print-ready flyer and captions for{" "}
-              {streetLine(l)}. Everything is sized for each platform and already includes the compliance language.
-            </p>
-            <p className="muted">Download, post, done. Need a tweak? Just reply to {loFirst}.</p>
             <div className="buyer-link" id="buyer-page">
               <p className="label">Your buyer page</p>
               <p className="muted">

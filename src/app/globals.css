@@ -89,6 +89,7 @@ code { font-size: 0.88em; background: var(--paper); border: 1px solid var(--line
   .nav-links { display: none; }
   .nav-sub { display: block; }
   .nav-inner { min-height: 64px; }
+  .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px 20px; }
   .kit [id] { scroll-margin-top: 120px; }
 }
 
@@ -134,10 +135,12 @@ code { font-size: 0.88em; background: var(--paper); border: 1px solid var(--line
 .gtab[aria-selected="true"] { background: var(--ink); color: var(--white); }
 .gtab-count { font-size: 0.7rem; letter-spacing: 0; opacity: 0.55; }
 .gtabs-note { font-size: 0.88rem; max-width: 520px; }
-/* Graphics sit straight on the page in an invisible 4:5 slot, bottom-aligned so every label starts on the same line. */
-.cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 32px 24px; align-items: start; }
-.card-img { display: flex; align-items: flex-end; justify-content: flex-start; aspect-ratio: 4 / 5; }
-.card-img img { width: auto; height: auto; max-width: 100%; max-height: 100%; box-shadow: 0 2px 10px rgba(10,10,10,0.1); transition: transform 0.35s ease; }
+/* One row, every graphic the same height: each card's width follows its shape (--ratio = width / height),
+   so the gaps between graphics are all exactly the same. */
+.cards { display: flex; gap: 28px; align-items: flex-start; }
+.card { flex: var(--ratio, 1) 1 0; min-width: 0; }
+.card-img { display: block; }
+.card-img img { width: 100%; height: auto; box-shadow: 0 2px 10px rgba(10,10,10,0.1); transition: transform 0.35s ease; }
 .card-img:hover img { transform: scale(1.03); }
 .card-meta { padding-top: 14px; }
 .card-use { color: var(--muted); font-size: 0.82rem; margin: 2px 0 10px; }
@@ -199,7 +202,7 @@ details[open] .row-hint::after { content: " −"; }
   .intro-inner, .dark-inner { grid-template-columns: 1fr; gap: 28px; }
   .work-head { flex-direction: column; align-items: flex-start; gap: 20px; }
   .work-head > div { text-align: left; }
-  .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 14px; }
+  .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 16px; }
   .chip { top: 16px; }
   .partner-card { flex-direction: column; align-items: flex-start; }
   .foot-cols { grid-template-columns: 1fr 1fr; }
@@ -326,5 +329,5 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent);
 }
 
 /* ---------- kit: buyer page link ---------- */
-.buyer-link { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--line); display: grid; gap: 10px; }
+.buyer-link { display: grid; gap: 10px; }
 .buyer-link .actions { margin-top: 6px; }
