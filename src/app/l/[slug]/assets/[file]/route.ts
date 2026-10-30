@@ -1,4 +1,5 @@
 import { getKit } from "@/lib/listings";
+import { buyerPagePath, originFromRequest } from "@/lib/site";
 import { assetFilename, renderAssets } from "@/lib/render/render";
 import { pngToLetterPdf } from "@/lib/render/pdf";
 import { ASSETS, assetsFor, isAssetName, isPrintAsset } from "@/lib/render/templates";
@@ -20,7 +21,7 @@ export async function GET(req: Request, ctx: RouteContext<"/l/[slug]/assets/[fil
   const filename = assetFilename(kit.listing, name).replace(/\.png$/, `.${ext}`);
   const disposition = `${download ? "attachment" : "inline"}; filename="${filename}"`;
 
-  const [image] = await renderAssets(kit.listing, kit.lo, [name]);
+  const [image] = await renderAssets(kit.listing, kit.lo, [name], originFromRequest(req) + buyerPagePath(slug));
   if (ext === "png") {
     return new Response(image.body, {
       headers: { "Content-Type": "image/png", "Cache-Control": CACHE, "Content-Disposition": disposition },

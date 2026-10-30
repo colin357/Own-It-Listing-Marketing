@@ -43,7 +43,8 @@ function factsLine(l: Listing): string {
   return `${formatPrice(l.price)}${stats ? ` | ${stats}` : ""}`;
 }
 
-export function buildEmails(l: Listing, lo: LoanOfficer): Email[] {
+/** `url` is where buyers see the home: the buyer page, or the MLS / Zillow link. */
+export function buildEmails(l: Listing, lo: LoanOfficer, url = l.listingUrl): Email[] {
   const street = streetLine(l);
   const sold = l.status === "just-sold";
   const pending = l.status === "under-contract";
@@ -51,7 +52,7 @@ export function buildEmails(l: Listing, lo: LoanOfficer): Email[] {
   const oh = formatOpenHouse(l);
   const pay = paymentInfo(l, lo);
   const programs = active ? programOptions(l, lo) : null;
-  const link = l.listingUrl ? `See all the photos and details: ${l.listingUrl}` : null;
+  const link = url ? `See all the photos and details: ${url}` : null;
   const apply = lo.applyUrl ? `Get pre-approved online: ${lo.applyUrl}` : null;
   const c = activeConcession(l);
   const credit = c ? concessionSentence(c) : null;
