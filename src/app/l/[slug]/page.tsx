@@ -115,6 +115,20 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
     );
   };
 
+  // Same order as the sections on the page, so the header reads top to bottom.
+  const navLinks = [
+    ["#buyer-page", "Buyer page"],
+    ...(basePrograms ? [["#seller-credit", "Seller incentive"]] : []),
+    ["#graphics", "Graphics"],
+    ["#captions", "Captions"],
+    ["#emails", "Emails"],
+    ["#contact", "Contact"],
+  ].map(([href, text]) => (
+    <a key={href} href={href}>
+      {text}
+    </a>
+  ));
+
   return (
     <div className="kit" style={{ "--accent": accent, "--on-accent": onAccent } as CSSProperties}>
       <header className="nav">
@@ -125,18 +139,14 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
           ) : (
             <span className="wordmark">{lo.company}</span>
           )}
-          <nav className="nav-links">
-            <a href="#graphics">Graphics</a>
-            <a href="#buyer-page">Buyer page</a>
-            {basePrograms ? <a href="#seller-credit">Seller incentive</a> : null}
-            <a href="#captions">Captions</a>
-            <a href="#emails">Emails</a>
-            <a href="#contact">Contact</a>
-          </nav>
+          <nav className="nav-links">{navLinks}</nav>
           <a className="pill" href={`/l/${l.slug}/download`}>
             Download all
           </a>
         </div>
+        <nav className="nav-sub" aria-label="Sections">
+          <div className="wrap nav-sub-inner">{navLinks}</div>
+        </nav>
       </header>
 
       <section className="hero">
