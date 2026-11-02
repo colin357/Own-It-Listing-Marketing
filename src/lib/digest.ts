@@ -52,30 +52,34 @@ export function agentMailto(l: Listing, lo: LoanOfficer, kitUrl: string): { href
 }
 
 /**
- * Table-cell "bulletproof" button: the cell carries the color, so it still
- * reads as a button in Outlook, Gmail and apps that ignore styles on links.
- * Each button sits in an inline-block wrapper so a row of them wraps on phones;
- * Outlook for Windows ignores inline-block, so buttonRow() gives it a table row.
+ * "Bulletproof" button: a plain table cell carries the colour and border, and
+ * the link inside carries the padding. No inline-block div wrappers or conditional
+ * comments, which Outlook on the web and Outlook for Windows mangle.
  */
 function button(href: string, label: string, primary: boolean): string {
   const bg = primary ? "#0a0a0a" : "#ffffff";
   const fg = primary ? "#ffffff" : "#0a0a0a";
   // mailto: links open the mail app; target="_blank" makes some webmail open an empty tab too.
   const target = href.startsWith("mailto:") ? "" : ' target="_blank"';
-  return `<div style="display:inline-block;vertical-align:top;margin:0 8px 8px 0">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td bgcolor="${bg}" style="background:${bg};border:2px solid #0a0a0a;border-radius:6px">
-        <a href="${esc(href)}"${target} style="display:block;padding:11px 20px;color:${fg};font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:700;text-decoration:none;white-space:nowrap">${label}</a>
-        </td></tr></table>
-      </div>`;
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate"><tr>
+      <td align="center" bgcolor="${bg}" style="background-color:${bg};border:2px solid #0a0a0a;border-radius:6px;mso-padding-alt:11px 20px">
+        <a href="${esc(href)}"${target} style="display:inline-block;padding:11px 20px;color:${fg};font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:18px;font-weight:700;text-decoration:none">${label}</a>
+      </td></tr></table>`;
 }
 
-function buttonRow(buttons: string[]): string {
-  const mso = (b: string) => `<!--[if mso]><td valign="top"><![endif]-->${b}<!--[if mso]></td><![endif]-->`;
-  return `<div style="margin:16px 0 0;font-size:0;line-height:0">
-      <!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><![endif]-->
-      ${buttons.map(mso).join("\n      ")}
-      <!--[if mso]></tr></table><![endif]-->
-    </div>`;
+/**
+ * The main "Email kit" button and its note, then the two smaller buttons
+ * side by side in a two-cell table, which fits a phone without wrapping.
+ */
+function buttonRows(primary: string, note: string, secondary: string[]): string {
+  const cells = secondary
+    .map((b, i) => `<td valign="top" style="padding:0 ${i < secondary.length - 1 ? 8 : 0}px 0 0">${b}</td>`)
+    .join("");
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:16px 0 8px">
+      <tr><td style="padding:0 0 6px">${primary}</td></tr>
+      <tr><td style="padding:0 0 12px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.4;color:#5b5b5b">${note}</td></tr>
+      <tr><td><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>${cells}</tr></table></td></tr>
+    </table>`;
 }
 
 function kitCard(l: Listing, lo: LoanOfficer, origin: string): string {
@@ -102,12 +106,10 @@ function kitCard(l: Listing, lo: LoanOfficer, origin: string): string {
     <p style="margin:4px 0 0;font-size:14px;color:#5b5b5b">${esc(facts)}</p>
     <p style="margin:10px 0 0;font-size:14px;color:#0a0a0a">Listed by <strong>${esc(agent)}</strong>${l.agent.phone ? ` · ${esc(l.agent.phone)}` : ""}${l.agent.email ? ` · ${esc(l.agent.email)}` : ""}</p>
     ${noPhotos}
-    ${buttonRow([
-      button(mail.href, mailLabel, true),
+    ${buttonRows(button(mail.href, mailLabel, true), mailNote, [
       button(kitUrl, "Open kit", false),
       button(`${kitUrl}/download`, "Download all", false),
     ])}
-    <p style="margin:0;font-size:12px;line-height:1.4;color:#5b5b5b">${mailNote}</p>
     <p style="margin:16px 0 4px;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#5b5b5b">Or copy and text to ${esc(agentFirst ?? "the agent")}</p>
     <p style="margin:0;padding:12px 14px;background:#f4f3f1;font-size:14px;line-height:1.5;color:#0a0a0a">${esc(agentMessage(l, kitUrl))}</p>
   </td></tr>
