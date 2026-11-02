@@ -32,18 +32,16 @@ const EMAIL_RE = /^[^\s@,;<>"]+@[^\s@,;<>"]+\.[^\s@,;<>"]+$/;
  * loan officer's own mail app, so the agent sees it come from the loan officer.
  * When we don't have a usable agent email, the draft opens with an empty To line.
  */
-export function agentMailto(l: Listing, lo: LoanOfficer, kitUrl: string): { href: string; hasEmail: boolean } {
+export function agentMailto(l: Listing, kitUrl: string): { href: string; hasEmail: boolean } {
   const email = l.agent.email?.trim() ?? "";
   const hasEmail = EMAIL_RE.test(email);
   const who = firstName(l.agent.name);
   const subject = `Marketing kit for ${streetLine(l)}`;
-  const sig = [lo.name, lo.title, lo.company, lo.phone, lo.nmls ? `NMLS #${lo.nmls}` : ""].filter(Boolean).join("\n");
   const body = [
     `Hi${who ? ` ${who}` : ""},`,
     `Congrats on your new listing at ${streetLine(l)}! I put together a free marketing kit for it: social posts, flyers, captions and emails, all ready to download and post.`,
     kitUrl,
     "Let me know if you'd like anything changed.",
-    sig,
   ].join("\n\n");
   // encodeURIComponent (not URLSearchParams) so spaces become %20, which every mail app reads.
   const to = hasEmail ? encodeURIComponent(email).replace(/%40/g, "@") : "";
@@ -82,10 +80,10 @@ function buttonRows(primary: string, note: string, secondary: string[]): string 
     </table>`;
 }
 
-function kitCard(l: Listing, lo: LoanOfficer, origin: string): string {
+function kitCard(l: Listing, origin: string): string {
   const kitUrl = `${origin}/l/${l.slug}`;
   const agentFirst = firstName(l.agent.name);
-  const mail = agentMailto(l, lo, kitUrl);
+  const mail = agentMailto(l, kitUrl);
   const mailLabel = `Email kit to ${esc(agentFirst ?? "the agent")}`;
   const mailNote = mail.hasEmail
     ? `Opens an email to ${esc(l.agent.email!.trim())} in your mail app with the kit link. Just hit send.`
@@ -137,7 +135,7 @@ export function renderDigest(lo: LoanOfficer, kits: Listing[], origin: string): 
     <h1 style="margin:10px 0 0;font-size:26px;line-height:1.15;color:#0a0a0a">${n === 1 ? "A new listing kit is ready" : `${n} new listing kits are ready`}</h1>
     <p style="margin:12px 0 0;font-size:15px;line-height:1.55;color:#0a0a0a">Hi ${esc(firstName(lo.name) ?? lo.name)}, ${n === 1 ? "one of your agents just listed a home" : `${n} of your agents' new listings came in`}. Each kit has social posts, flyers, captions and emails, ready to go. Tap <strong>Email kit</strong> under a listing to send it to the agent from your own email, or copy the message to text it.</p>
   </td></tr>
-  <tr><td style="padding:20px 32px 8px">${kits.map((l) => kitCard(l, lo, origin)).join("")}</td></tr>
+  <tr><td style="padding:20px 32px 8px">${kits.map((l) => kitCard(l, origin)).join("")}</td></tr>
   <tr><td style="padding:0 32px 28px">
     <p style="margin:0;font-size:12px;line-height:1.5;color:#5b5b5b">Payment estimates on the kits use the rates and disclosures set up for you. Reply to this email with any changes.</p>
   </td></tr>
