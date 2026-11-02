@@ -174,6 +174,22 @@ export async function pendingDigests(origin: string): Promise<{ digests: Digest[
   return { digests, skipped };
 }
 
+/**
+ * An email for "Send test": the first pending digest, or, when nothing is
+ * waiting (every kit already emailed, or the loan officer has no email
+ * address), one built from the newest kits so a test can always be sent.
+ */
+export async function testDigest(origin: string): Promise<{ loName: string; subject: string; html: string } | null> {
+  const { digests } = await pendingDigests(origin);
+  if (digests[0]) return { loName: digests[0].lo.name, subject: digests[0].subject, html: digests[0].html };
+  const [all, los] = await Promise.all([listings.list(), loanOfficers.list()]);
+  const newest = [...all].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const lo = los.find((x) => x.slug === newest[0]?.loanOfficerSlug);
+  if (!lo) return null;
+  const kits = newest.filter((l) => l.loanOfficerSlug === lo.slug).slice(0, 3);
+  return { loName: lo.name, ...renderDigest(lo, kits, origin) };
+}
+
 /** Emails every loan officer their new kits and marks them sent. Returns errors. */
 export async function sendDigests(origin: string): Promise<{ sent: number; errors: string[] }> {
   if (!mailConfigured()) return { sent: 0, errors: [] };

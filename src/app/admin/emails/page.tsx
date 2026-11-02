@@ -19,7 +19,7 @@ export default async function EmailsPage({ searchParams }: { searchParams: Promi
         <h1>LO emails</h1>
         <div className="filters">
           <form action={sendTestAction}>
-            <button className="btn btn-small btn-ghost" disabled={!ready || !digests.length}>
+            <button className="btn btn-small btn-ghost" disabled={!ready}>
               Send test to {ready ? process.env.MAIL_FROM : "me"}
             </button>
           </form>
@@ -35,8 +35,16 @@ export default async function EmailsPage({ searchParams }: { searchParams: Promi
         their last email. Sending from: <strong>{ready ? process.env.MAIL_FROM : "not set up yet"}</strong>.{" "}
         {digests.length
           ? `${total} kit${total === 1 ? "" : "s"} waiting for ${digests.length} loan officer${digests.length === 1 ? "" : "s"}.`
-          : "Nothing waiting to send."}
+          : "Nothing waiting to send, so a test email uses the newest kits."}
       </p>
+      {!ready ? (
+        <div className="alert">
+          <p>
+            Email isn&apos;t set up on this deployment. Add MS_TENANT_ID, MS_CLIENT_ID, MS_CLIENT_SECRET and MAIL_FROM in Vercel
+            (Production), then redeploy.
+          </p>
+        </div>
+      ) : null}
       {skipped.length ? (
         <div className="alert">
           {skipped.map((s) => (
