@@ -29,8 +29,10 @@ export function RosterForm() {
         <span className="field-label">Metros CSV</span>
         <input type="file" name="metros" accept=".csv,text/csv" />
         <span className="field-hint">
-          Columns: name (loan officer, or &quot;A / B&quot; for a team), city, state, zip, latitude, longitude,
-          radius_miles (max 100). Replaces the current metros.
+          Columns: name (loan officer, or &quot;A / B&quot; for a team), city, state, zip, radius_miles (max 100),
+          and optionally latitude, longitude. Latitude and longitude are filled in from the zip when blank. For more
+          than one area, add another row for the same loan officer or list zips in one cell (&quot;75034; 75007&quot;).
+          Replaces the current metros.
         </span>
       </label>
       <div className="form-actions">

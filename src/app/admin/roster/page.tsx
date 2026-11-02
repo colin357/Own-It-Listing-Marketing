@@ -31,13 +31,13 @@ export default async function RosterPage() {
               <tr>
                 <th>Loan officer</th>
                 <th>Agents</th>
-                <th>Metro</th>
+                <th>Search areas</th>
                 <th>Set up in app</th>
               </tr>
             </thead>
             <tbody>
               {names.map((n) => {
-                const metro = metros.find((m) => m.loanOfficers.some((x) => key(x) === key(n)));
+                const areas = metros.filter((m) => m.loanOfficers.some((x) => key(x) === key(n)));
                 return (
                   <tr key={n}>
                     <td>
@@ -45,7 +45,14 @@ export default async function RosterPage() {
                     </td>
                     <td>{perLo.get(n) ?? 0}</td>
                     <td className="small">
-                      {metro ? `${metro.city}, ${metro.state} · ${metro.radiusMiles} mi` : "No metro, so no listings are checked"}
+                      {areas.length
+                        ? areas.map((m, i) => (
+                            <div key={i}>
+                              {m.city}, {m.state}
+                              {m.zip ? ` ${m.zip}` : ""} · {m.radiusMiles} mi
+                            </div>
+                          ))
+                        : "No metro, so no listings are checked"}
                     </td>
                     <td className="small">
                       {loKeys.has(key(n)) ? "Yes" : "No: add them under Loan officers so kits can be created"}

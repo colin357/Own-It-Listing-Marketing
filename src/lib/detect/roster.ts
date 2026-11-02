@@ -2,6 +2,7 @@ import "server-only";
 import { documents } from "../store";
 import { ValidationError } from "../validate";
 import type { Metro, RosterAgent } from "./types";
+import { lookupZip, splitZips } from "./zips";
 
 /** Minimal RFC 4180 CSV parser (quoted fields, escaped quotes, CRLF). */
 export function parseCsv(text: string): Record<string, string>[] {
@@ -59,28 +60,58 @@ export function splitNames(name: string): string[] {
 /**
  * Accepts metros.csv rows (name, city, state, zip, latitude, longitude,
  * radius_miles) or the same fields as JSON.
+ *
+ * A loan officer can cover several areas: either one row per area, or several
+ * zips in one row's zip column ("75034; 75007"). Latitude and longitude are
+ * optional when a zip is given; each zip's centre comes from a bundled table.
+ * With several zips in a row, each zip becomes its own search area with the
+ * row's radius, and any latitude/longitude on the row is ignored.
  */
 export function parseMetros(rows: Record<string, unknown>[]): Metro[] {
   const issues: string[] = [];
-  const metros = rows.map((row, i) => {
+  const metros: Metro[] = [];
+  rows.forEach((row, i) => {
+    const line = `row ${i + 2}`;
     const name = first(row, "name", "loan_officer", "loanOfficer") ?? "";
-    const latitude = Number(first(row, "latitude", "lat"));
-    const longitude = Number(first(row, "longitude", "lng", "lon"));
-    const radiusMiles = Number(first(row, "radius_miles", "radiusMiles", "radius") ?? 50);
-    if (!name) issues.push(`row ${i + 2}: name is required`);
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude))
-      issues.push(`row ${i + 2}: latitude and longitude are required`);
-    return {
-      name,
-      loanOfficers: splitNames(name),
-      city: first(row, "city") ?? "",
-      state: (first(row, "state") ?? "").toUpperCase(),
-      zip: first(row, "zip", "zip_code", "zipCode"),
-      latitude,
-      longitude,
-      // RentCast's radius search caps at 100 miles.
-      radiusMiles: Math.min(100, Math.max(1, Number.isFinite(radiusMiles) ? radiusMiles : 50)),
-    };
+    if (!name) issues.push(`${line}: name is required`);
+    const rawRadius = Number(first(row, "radius_miles", "radiusMiles", "radius") ?? 50);
+    // RentCast's radius search caps at 100 miles.
+    const radiusMiles = Math.min(100, Math.max(1, Number.isFinite(rawRadius) ? rawRadius : 50));
+    const base = { name, loanOfficers: splitNames(name), radiusMiles };
+    const city = first(row, "city") ?? "";
+    const state = (first(row, "state") ?? "").toUpperCase();
+    const zips = splitZips(first(row, "zip", "zips", "zip_code", "zip_codes", "zipCode"));
+    const lat = first(row, "latitude", "lat");
+    const lng = first(row, "longitude", "lng", "lon");
+
+    if (zips.length <= 1 && lat != null && lng != null) {
+      const latitude = Number(lat);
+      const longitude = Number(lng);
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude))
+        issues.push(`${line}: latitude and longitude must be numbers`);
+      metros.push({ ...base, city, state, zip: zips[0], latitude, longitude });
+      return;
+    }
+    if (!zips.length) {
+      issues.push(`${line}: add a zip code (or latitude and longitude)`);
+      return;
+    }
+    for (const zip of zips) {
+      const z = lookupZip(zip);
+      if (!z) {
+        issues.push(`${line}: zip ${zip} not found, so add latitude and longitude for it on its own row`);
+        continue;
+      }
+      metros.push({
+        ...base,
+        // With one zip, keep the city/state the sheet gives; with several, use each zip's own.
+        city: zips.length === 1 && city ? city : z.city,
+        state: zips.length === 1 && state ? state : z.state,
+        zip: z.zip,
+        latitude: z.latitude,
+        longitude: z.longitude,
+      });
+    }
   });
   if (issues.length) throw new ValidationError(issues.slice(0, 20));
   return metros;
