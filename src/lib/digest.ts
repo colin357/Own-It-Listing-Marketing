@@ -114,6 +114,16 @@ function kitCard(l: Listing, lo: LoanOfficer, origin: string): string {
 </table>`;
 }
 
+/**
+ * Own It Social logo for the top of every email. Mail apps block data: URIs and
+ * attachments are clunky, so it's a hosted PNG (public/email) on the site's own
+ * public domain. The file is 2x for sharp retina display; the alt text spells
+ * out the name for clients that block images until the reader allows them.
+ */
+export function emailLogo(origin: string): string {
+  return `<img src="${esc(origin)}/email/own-it-social-logo.png" width="140" height="59" alt="OWN IT SOCIAL" style="display:block;width:140px;height:59px;border:0;outline:none;text-decoration:none;font-family:Arial,Helvetica,sans-serif;font-size:20px;font-weight:900;color:#0a0a0a">`;
+}
+
 export function renderDigest(lo: LoanOfficer, kits: Listing[], origin: string): { subject: string; html: string } {
   const n = kits.length;
   const subject = n === 1 ? `New listing kit: ${streetLine(kits[0])}` : `${n} new listing kits for your agents`;
@@ -122,7 +132,8 @@ export function renderDigest(lo: LoanOfficer, kits: Listing[], origin: string): 
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f3f1"><tr><td align="center" style="padding:28px 12px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;font-family:Arial,Helvetica,sans-serif">
   <tr><td style="padding:28px 32px 8px">
-    <p style="margin:0;font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#5b5b5b">Own It Social · Listing kits</p>
+    ${emailLogo(origin)}
+    <p style="margin:18px 0 0;font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#5b5b5b">Listing kits</p>
     <h1 style="margin:10px 0 0;font-size:26px;line-height:1.15;color:#0a0a0a">${n === 1 ? "A new listing kit is ready" : `${n} new listing kits are ready`}</h1>
     <p style="margin:12px 0 0;font-size:15px;line-height:1.55;color:#0a0a0a">Hi ${esc(firstName(lo.name) ?? lo.name)}, ${n === 1 ? "one of your agents just listed a home" : `${n} of your agents' new listings came in`}. Each kit has social posts, flyers, captions and emails, ready to go. Tap <strong>Email kit</strong> under a listing to send it to the agent from your own email, or copy the message to text it.</p>
   </td></tr>
