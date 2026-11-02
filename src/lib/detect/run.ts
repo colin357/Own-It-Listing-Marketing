@@ -252,39 +252,10 @@ export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin
     const open = await detections.list();
 
     // Zillow often shows a listing's photos a day or two after it hits the feed,
-    // so keep retrying for a week for kits still without photos.
-    const weekAgo = Date.now() - 7 * 86_400_000;
-    const retry = [];
-    for (const det of open) {
-      if (det.status !== "created" || !det.listingSlug || Date.parse(det.createdAt) < weekAgo) continue;
-      const kit = await listings.get(det.listingSlug);
-      if (kit && !kit.photos.length) retry.push({ det, kit });
-    }
-    // Only retry when there is time left; the next run tries again.
-    const retryTimeout = photoTimeout(startMs);
-    if (retry.length && photoSource() && retryTimeout) {
-      try {
-        const found = await lookupPhotos(retry.map((r) => r.det.listing), retryTimeout);
-        for (const { det, kit } of retry) {
-          const p = found.get(det.listing.id);
-          if (!p?.photos.length) continue;
-          // Re-read so a photo the agent just uploaded isn't overwritten.
-          const latest = await listings.get(kit.slug);
-          if (!latest || latest.photos.length) continue;
-          await listings.save({
-            ...latest,
-            photos: p.photos,
-            description: latest.description ?? p.description,
-            listingUrl: latest.listingUrl ?? p.listingUrl,
-            updatedAt: new Date().toISOString(),
-          });
-          await detections.save({ ...det, listing: applyPhotos(det.listing, p), updatedAt: new Date().toISOString() });
-          photosAdded++;
-        }
-      } catch (err) {
-        errors.push(`Photo retry failed: ${(err as Error).message}`);
-      }
-    }
+    // so keep retrying for a week for kits still without photos (only while time is left).
+    const backfill = await backfillPhotos({ startMs, maxAgeDays: 7, open });
+    photosAdded = backfill.added;
+    errors.push(...backfill.errors);
 
     // Confident matches that were waiting for their loan officer to be added.
     for (const det of open) {
@@ -339,6 +310,69 @@ export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin
   // A test run saves nothing else, so keep what it found for the admin page to show.
   await documents.set(dryRun ? "detection-test" : "detection-run", dryRun ? { run, detections: results } : run);
   return { run, detections: results };
+}
+
+export interface PhotoGap {
+  det: Detection;
+  kit: Listing;
+}
+
+/** Auto-created kits that still have no photos, newest first. */
+export async function kitsMissingPhotos(maxAgeDays?: number, open?: Detection[]): Promise<PhotoGap[]> {
+  const since = maxAgeDays ? Date.now() - maxAgeDays * 86_400_000 : 0;
+  const out: PhotoGap[] = [];
+  for (const det of open ?? (await detections.list())) {
+    if (det.status !== "created" || !det.listingSlug || Date.parse(det.createdAt) < since) continue;
+    const kit = await listings.get(det.listingSlug);
+    if (kit && !kit.photos.length) out.push({ det, kit });
+  }
+  return out.sort((a, b) => b.det.createdAt.localeCompare(a.det.createdAt));
+}
+
+/** Homes per Zillow lookup, small enough that each one finishes well inside its timeout. */
+const PHOTO_BATCH = 10;
+
+/**
+ * Looks up Zillow photos (via Apify) for kits that have none. Uses no listings
+ * feed (RentCast) requests. Works in batches and stops when the time budget
+ * runs out, so it can simply be run again to continue.
+ */
+export async function backfillPhotos({
+  startMs = Date.now(),
+  maxAgeDays,
+  open,
+}: { startMs?: number; maxAgeDays?: number; open?: Detection[] } = {}) {
+  const gaps = await kitsMissingPhotos(maxAgeDays, open);
+  const result = { missing: gaps.length, tried: 0, added: 0, errors: [] as string[] };
+  if (!gaps.length || !photoSource()) return result;
+  for (let i = 0; i < gaps.length; i += PHOTO_BATCH) {
+    const timeoutSec = photoTimeout(startMs);
+    if (!timeoutSec) break;
+    const batch = gaps.slice(i, i + PHOTO_BATCH);
+    result.tried += batch.length;
+    try {
+      const found = await lookupPhotos(batch.map((g) => g.det.listing), timeoutSec);
+      for (const { det, kit } of batch) {
+        const p = found.get(det.listing.id);
+        if (!p?.photos.length) continue;
+        // Re-read so a photo the agent just uploaded isn't overwritten.
+        const latest = await listings.get(kit.slug);
+        if (!latest || latest.photos.length) continue;
+        await listings.save({
+          ...latest,
+          photos: p.photos,
+          description: latest.description ?? p.description,
+          listingUrl: latest.listingUrl ?? p.listingUrl,
+          updatedAt: new Date().toISOString(),
+        });
+        await detections.save({ ...det, listing: applyPhotos(det.listing, p), updatedAt: new Date().toISOString() });
+        result.added++;
+      }
+    } catch (err) {
+      result.errors.push(`Photo retry failed: ${(err as Error).message}`);
+    }
+  }
+  return result;
 }
 
 /** Approve a detection from the review queue (or one waiting on its loan officer). */

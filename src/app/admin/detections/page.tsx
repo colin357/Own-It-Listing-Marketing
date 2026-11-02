@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { detections, loanOfficers } from "@/lib/store";
 import { formatPrice } from "@/lib/format";
-import { lastRun, lastTestRun } from "@/lib/detect/run";
+import { kitsMissingPhotos, lastRun, lastTestRun } from "@/lib/detect/run";
+import { PendingButton } from "@/components/admin/PendingButton";
 import { currentMarketRates } from "@/lib/rates";
 import { listingProvider, photoSource } from "@/lib/detect/providers";
 import type { DetectionStatus } from "@/lib/detect/types";
-import { approveAction, dismissAction, runNowAction } from "./actions";
+import { approveAction, dismissAction, fetchPhotosAction, runNowAction } from "./actions";
 
 export const maxDuration = 300;
 
@@ -20,12 +21,13 @@ export default async function DetectionsPage({ searchParams }: PageProps<"/admin
   const sp = await searchParams;
   const status = typeof sp.status === "string" ? sp.status : "";
   const msg = typeof sp.msg === "string" ? sp.msg : "";
-  const [all, los, run, test, rates] = await Promise.all([
-    detections.list(),
+  const all = await detections.list();
+  const [los, run, test, rates, noPhotos] = await Promise.all([
     loanOfficers.list(),
     lastRun(),
     lastTestRun(),
     currentMarketRates(),
+    kitsMissingPhotos(undefined, all),
   ]);
   const rows = all.filter((d) => (status ? d.status === status : d.status !== "dismissed"));
   const count = (s: DetectionStatus) => all.filter((d) => d.status === s).length;
@@ -39,12 +41,25 @@ export default async function DetectionsPage({ searchParams }: PageProps<"/admin
       <div className="toolbar">
         <h1>New listings</h1>
         <form action={runNowAction} className="filters">
-          <button className="btn btn-small btn-ghost" name="dryRun" value="1" disabled={!provider}>
+          <PendingButton
+            className="btn btn-small btn-ghost"
+            name="dryRun"
+            value="1"
+            disabled={!provider}
+            pendingText="Test running…"
+            note="Checking every area. Takes 1 to 2 minutes; keep this tab open."
+          >
             Test run
-          </button>
-          <button className="btn btn-small" name="dryRun" value="0" disabled={!provider}>
+          </PendingButton>
+          <PendingButton
+            name="dryRun"
+            value="0"
+            disabled={!provider}
+            pendingText="Running…"
+            note="Pulling listings, building kits, fetching photos, then emailing LOs. Takes up to about 4 minutes; keep this tab open."
+          >
             Run now
-          </button>
+          </PendingButton>
         </form>
       </div>
 
@@ -115,6 +130,39 @@ export default async function DetectionsPage({ searchParams }: PageProps<"/admin
               results, or check back after tomorrow&apos;s run.
             </p>
           )}
+        </div>
+      ) : null}
+      {noPhotos.length ? (
+        <div className="alert">
+          <div className="toolbar" style={{ margin: 0 }}>
+            <strong>
+              {noPhotos.length} kit{noPhotos.length === 1 ? "" : "s"} without photos
+            </strong>
+            <form action={fetchPhotosAction}>
+              <PendingButton
+                disabled={!photos}
+                pendingText="Fetching photos…"
+                note="Looking each home up on Zillow (no RentCast use). Takes up to about 4 minutes; keep this tab open."
+              >
+                Fetch missing photos
+              </PendingButton>
+            </form>
+          </div>
+          <details>
+            <summary className="small">Show which</summary>
+            <ul>
+              {noPhotos.map(({ det, kit }) => (
+                <li key={det.slug}>
+                  <a href={`/l/${kit.slug}`} target="_blank" rel="noreferrer">
+                    {kit.address}, {kit.city}
+                  </a>{" "}
+                  <span className="muted small">
+                    (LO {det.loanOfficerName}, found {new Date(det.createdAt).toLocaleDateString("en-US")})
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </details>
         </div>
       ) : null}
       {waitingLos.length ? (
@@ -209,7 +257,7 @@ export default async function DetectionsPage({ searchParams }: PageProps<"/admin
                               ))}
                             </select>
                           ) : null}
-                          <button className="btn btn-small">Create kit</button>
+                          <PendingButton pendingText="Creating…">Create kit</PendingButton>
                           <button className="btn btn-small btn-ghost" formAction={dismissAction.bind(null, d.slug)}>
                             Not a match
                           </button>

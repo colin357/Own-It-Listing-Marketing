@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { siteUrl } from "@/lib/site";
-import { approveDetection, dismissDetection, runDetection } from "@/lib/detect/run";
+import { approveDetection, backfillPhotos, dismissDetection, runDetection } from "@/lib/detect/run";
 import { parseCsv, parseMetros, parseRoster, saveMetros, saveRoster } from "@/lib/detect/roster";
 import { ValidationError } from "@/lib/validate";
 
@@ -15,6 +15,28 @@ export async function runNowAction(fd: FormData) {
     msg = `${dryRun ? "Test run" : "Run"} done: ${run.listingsScanned} listings scanned, ${run.matches} new matches, ${run.created} kits created${run.errors.length ? `, ${run.errors.length} errors` : ""}.`;
   } catch (err) {
     msg = `Run failed: ${(err as Error).message}`;
+  }
+  revalidatePath("/admin/detections");
+  redirect(`/admin/detections?msg=${encodeURIComponent(msg)}`);
+}
+
+/** Zillow photo lookup for every kit that has none. Uses no RentCast requests. */
+export async function fetchPhotosAction() {
+  let msg: string;
+  try {
+    const r = await backfillPhotos();
+    const left = r.missing - r.added;
+    msg = !r.missing
+      ? "Every kit already has photos."
+      : `Checked Zillow for ${r.tried} of ${r.missing} kits without photos and added photos to ${r.added}. ` +
+        (r.tried < r.missing
+          ? `Ran out of time; press Fetch missing photos again to check the other ${r.missing - r.tried}.`
+          : left
+            ? `${left} still have none on Zillow yet; the Monday and Thursday runs keep trying for a week.`
+            : "All done.") +
+        (r.errors.length ? ` ${r.errors.join(" ")}` : "");
+  } catch (err) {
+    msg = `Photo lookup failed: ${(err as Error).message}`;
   }
   revalidatePath("/admin/detections");
   redirect(`/admin/detections?msg=${encodeURIComponent(msg)}`);

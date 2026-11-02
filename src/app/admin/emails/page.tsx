@@ -2,6 +2,7 @@ import { pendingDigests } from "@/lib/digest";
 import { mailConfigured } from "@/lib/mail";
 import { siteUrl } from "@/lib/site";
 import { sendNowAction, sendTestAction } from "./actions";
+import { PendingButton } from "@/components/admin/PendingButton";
 
 export const dynamic = "force-dynamic";
 
@@ -19,14 +20,18 @@ export default async function EmailsPage({ searchParams }: { searchParams: Promi
         <h1>LO emails</h1>
         <div className="filters">
           <form action={sendTestAction}>
-            <button className="btn btn-small btn-ghost" disabled={!ready}>
+            <PendingButton className="btn btn-small btn-ghost" disabled={!ready} pendingText="Sending test…">
               Send test to {ready ? process.env.MAIL_FROM : "me"}
-            </button>
+            </PendingButton>
           </form>
           <form action={sendNowAction}>
-            <button className="btn btn-small" disabled={!ready || !digests.length}>
+            <PendingButton
+              disabled={!ready || !digests.length}
+              pendingText="Sending…"
+              note="Emailing each loan officer. Usually under a minute; keep this tab open."
+            >
               Send to all LOs now
-            </button>
+            </PendingButton>
           </form>
         </div>
       </div>
