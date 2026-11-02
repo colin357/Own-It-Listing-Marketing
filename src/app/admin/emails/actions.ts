@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { siteUrl } from "@/lib/site";
-import { pendingDigests, sendDigests } from "@/lib/digest";
+import { sendDigests, testDigest } from "@/lib/digest";
 import { sendMail } from "@/lib/mail";
 
 export async function sendNowAction() {
@@ -22,12 +22,11 @@ export async function sendNowAction() {
 export async function sendTestAction() {
   let msg: string;
   try {
-    const { digests } = await pendingDigests(await siteUrl());
-    const d = digests[0];
-    if (!d) throw new Error("No kits are waiting, so there's nothing to preview.");
+    const d = await testDigest(await siteUrl());
+    if (!d) throw new Error("There are no kits yet, so there's nothing to put in a test email.");
     const to = process.env.MAIL_FROM!;
-    const errors = await sendMail([{ to: [to], subject: `[TEST for ${d.lo.name}] ${d.subject}`, html: d.html }]);
-    msg = errors.length ? `Test failed: ${errors.join(" ")}` : `Test email (${d.lo.name}'s) sent to ${to}. Nothing was sent to loan officers.`;
+    const errors = await sendMail([{ to: [to], subject: `[TEST for ${d.loName}] ${d.subject}`, html: d.html }]);
+    msg = errors.length ? `Test failed: ${errors.join(" ")}` : `Test email (${d.loName}'s) sent to ${to}. Nothing was sent to loan officers.`;
   } catch (err) {
     msg = `Test failed: ${(err as Error).message}`;
   }
