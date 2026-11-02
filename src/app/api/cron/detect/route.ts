@@ -16,9 +16,10 @@ function authorized(req: Request) {
 }
 
 /**
- * Vercel Cron runs in UTC, so vercel.json fires at both 11:00 and 12:00 UTC
+ * Vercel Cron runs in UTC, so vercel.json fires at 11:00, 12:00 and 13:00 UTC
  * and only the one that lands at 7 AM in New York does the work. That keeps
- * the run at 7 AM Eastern through daylight saving changes.
+ * the run at 7 AM Eastern through daylight saving changes, and there is always
+ * an hour-later run to retry emails (in winter 11:00 UTC comes before 7 AM).
  */
 function isScheduledHour(): boolean {
   const hour = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", hour12: false }).format(new Date());

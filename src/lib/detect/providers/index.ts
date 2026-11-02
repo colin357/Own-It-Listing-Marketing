@@ -30,8 +30,8 @@ export function photoSource(): string | null {
  * PHOTO_LOOKUP_URL, any endpoint (e.g. a Zapier/Make webhook) that receives
  * the listing as JSON and answers {"photos": [...], "description", "listingUrl"}.
  */
-export async function lookupPhotos(listings: SourceListing[]): Promise<Map<string, PhotoResult>> {
-  if (process.env.APIFY_TOKEN) return zillowPhotos(process.env.APIFY_TOKEN, listings);
+export async function lookupPhotos(listings: SourceListing[], timeoutSec?: number): Promise<Map<string, PhotoResult>> {
+  if (process.env.APIFY_TOKEN) return zillowPhotos(process.env.APIFY_TOKEN, listings, timeoutSec);
   const out = new Map<string, PhotoResult>();
   const url = process.env.PHOTO_LOOKUP_URL;
   if (!url) return out;

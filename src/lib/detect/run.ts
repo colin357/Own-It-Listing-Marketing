@@ -129,11 +129,26 @@ export interface RunOptions {
   origin: string;
 }
 
+/**
+ * The cron function is killed at 300s. Keep the photo scrapes inside this
+ * budget so there is always time left to save kits and email loan officers.
+ */
+const RUN_BUDGET_MS = 240_000;
+/** Time kept back after a photo scrape for kit creation, emails and saving the run. */
+const RESERVE_MS = 60_000;
+
+/** Apify timeout (seconds) that still fits the budget, or 0 when there isn't room for one. */
+function photoTimeout(startMs: number): number {
+  const left = Math.floor((startMs + RUN_BUDGET_MS - RESERVE_MS - Date.now()) / 1000) - 20;
+  return left >= 30 ? Math.min(180, left) : 0;
+}
+
 /** A listing counts as new for this many days after it first appears. */
 export const DEFAULT_DAYS = 7;
 
 export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin }: RunOptions) {
-  const startedAt = new Date().toISOString();
+  const startMs = Date.now();
+  const startedAt = new Date(startMs).toISOString();
   const provider = listingProvider();
   if (!provider) throw new Error("No listings feed configured. Set RENTCAST_API_KEY.");
   const [roster, metros, los] = await Promise.all([getRoster(), getMetros(), loanOfficers.list()]);
@@ -187,8 +202,10 @@ export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin
   // Photos only for matches, which keeps scraping to a handful of homes a day.
   let photos = new Map<string, PhotoResult>();
   if (photoSource() && found.length && !dryRun) {
+    const timeoutSec = photoTimeout(startMs);
     try {
-      photos = await lookupPhotos(found.map((f) => f.listing));
+      if (!timeoutSec) throw new Error("skipped, the listings feed used up the time budget");
+      photos = await lookupPhotos(found.map((f) => f.listing), timeoutSec);
     } catch (err) {
       errors.push(`Photo lookup failed: ${(err as Error).message}`);
     }
@@ -243,9 +260,11 @@ export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin
       const kit = await listings.get(det.listingSlug);
       if (kit && !kit.photos.length) retry.push({ det, kit });
     }
-    if (retry.length && photoSource()) {
+    // Only retry when there is time left; the next run tries again.
+    const retryTimeout = photoTimeout(startMs);
+    if (retry.length && photoSource() && retryTimeout) {
       try {
-        const found = await lookupPhotos(retry.map((r) => r.det.listing));
+        const found = await lookupPhotos(retry.map((r) => r.det.listing), retryTimeout);
         for (const { det, kit } of retry) {
           const p = found.get(det.listing.id);
           if (!p?.photos.length) continue;
