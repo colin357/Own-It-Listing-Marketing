@@ -63,19 +63,23 @@ function itemAddressKey(item: Item): string {
   return addressKey(street, String(item.zipcode ?? item.zipCode ?? "") || street.match(/\b\d{5}\b/)?.[0]);
 }
 
-export async function zillowPhotos(token: string, listings: SourceListing[]): Promise<Map<string, PhotoResult>> {
+export async function zillowPhotos(
+  token: string,
+  listings: SourceListing[],
+  timeoutSec = 180,
+): Promise<Map<string, PhotoResult>> {
   const out = new Map<string, PhotoResult>();
   if (!listings.length) return out;
   const actor = process.env.APIFY_ZILLOW_ACTOR || DEFAULT_ACTOR;
   const res = await fetch(
-    `https://api.apify.com/v2/acts/${actor}/run-sync-get-dataset-items?timeout=180&maxItems=${listings.length * 2}`,
+    `https://api.apify.com/v2/acts/${actor}/run-sync-get-dataset-items?timeout=${timeoutSec}&maxItems=${listings.length * 2}`,
     {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({ addresses: listings.map(addressQuery), propertyStatus: "FOR_SALE" }),
       cache: "no-store",
-      // Apify holds sync runs open for up to 300s; leave room in the 300s function budget.
-      signal: AbortSignal.timeout(200_000),
+      // Apify holds sync runs open for up to 300s; the caller sizes timeoutSec to fit the function budget.
+      signal: AbortSignal.timeout((timeoutSec + 20) * 1000),
     },
   );
   if (!res.ok) throw new Error(`Apify ${res.status}: ${(await res.text()).slice(0, 200)}`);
