@@ -22,7 +22,7 @@ import { ShareButton } from "@/components/ShareButton";
 import { AgentPhotoUpload } from "@/components/AgentPhotoUpload";
 import { blobMode } from "@/lib/blob";
 import { programOptions } from "@/lib/mortgage";
-import { activeConcession, concessionTag } from "@/lib/concessions";
+import { activeConcession, concessionTag, isLuxury } from "@/lib/concessions";
 import { ConcessionCalculator } from "@/components/ConcessionCalculator";
 import { GraphicsTabs } from "@/components/GraphicsTabs";
 import { buyerPagePath, siteUrl } from "@/lib/site";
@@ -257,7 +257,7 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
                 Is the seller willing to help with the buyer&apos;s costs? Pick an option and every graphic, flyer, caption and
                 email updates to match.
               </p>
-              <p className="muted">Not sure which to pick? A 2-1 buydown is the most popular. Or ask {loFirst}.</p>
+              <p className="muted">Not sure which to pick? {isLuxury(l.price) ? "A permanent buydown lowers the payment for the life of the loan." : "A 2-1 buydown is the most popular."} Or ask {loFirst}.</p>
             </div>
             <ConcessionCalculator slug={l.slug} price={l.price} scenarios={basePrograms.scenarios} initial={credit} />
           </div>
