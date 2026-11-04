@@ -14,6 +14,8 @@ export function BuildForm({ slug, token, photos }: { slug: string; token: string
   return (
     <div className="build">
       <form action={find} className="build-search">
+        <input type="hidden" name="prevMls" value={state.mls ?? ""} />
+        <input type="hidden" name="prevAddress" value={state.address ?? ""} />
         <label className="field">
           <span className="field-label">MLS number</span>
           <input

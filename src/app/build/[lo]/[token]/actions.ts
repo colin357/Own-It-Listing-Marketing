@@ -1,11 +1,12 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { countToday, loanOfficers } from "@/lib/store";
+import { countToday, loanOfficers, uncountToday } from "@/lib/store";
 import { validLoToken } from "@/lib/loLinks";
 import { findByAddress, findByKey, indexKey, normalizeMls } from "@/lib/detect/mls";
 import { buildKitForLo, existingKit } from "@/lib/detect/build";
 import type { SourceListing } from "@/lib/detect/types";
+import { UnreadableAddressError } from "@/lib/detect/providers/rentcast";
 
 /** Live address lookups per loan officer per day, to protect the RentCast quota. */
 const ADDRESS_LOOKUPS_PER_DAY = 25;
@@ -41,6 +42,13 @@ async function authorizedLo(slug: string, token: string) {
 
 const text = (fd: FormData, name: string) => String(fd.get(name) ?? "").trim();
 
+const ADDRESS_HELP = "Add the city, state and ZIP, like 123 Main St, Austin, TX 78704.";
+
+/** True when the address has a ZIP or ends in a city and two-letter state, so RentCast can place it. */
+function completeAddress(address: string): boolean {
+  return /\b\d{5}\b/.test(address) || /,\s*[^,]+,?\s+[A-Za-z]{2}\.?\s*$/.test(address);
+}
+
 function summary(l: SourceListing, existingSlug?: string): FoundListing {
   return {
     key: indexKey(l),
@@ -62,16 +70,34 @@ export async function findListingAction(slug: string, token: string, _prev: Find
   const lo = await authorizedLo(slug, token);
   if (!lo) return { error: "This link isn't valid anymore. Ask Own It Social for a new one." };
   const mlsInput = text(fd, "mls");
-  const address = text(fd, "address");
   const mls = normalizeMls(mlsInput);
+  // The address box keeps its last value. If only the MLS # changed since the last
+  // search, that address belongs to another listing, so don't search (or count) it again.
+  const typed = text(fd, "address");
+  const stale = !!typed && typed === text(fd, "prevAddress") && mls !== normalizeMls(text(fd, "prevMls"));
+  const address = stale ? "" : typed;
   if (!mls && !address) return { error: "Enter the listing's MLS number." };
 
   try {
     let listing = mls ? await findByKey(mls) : null;
     if (!listing && address) {
-      if ((await countToday(`address-lookup:${lo.slug}`)) > ADDRESS_LOOKUPS_PER_DAY)
-        return { mls: mlsInput, address, askAddress: true, error: "That's the limit of address lookups for today. Try again tomorrow." };
-      const results = await findByAddress(address);
+      if (!completeAddress(address)) return { mls: mlsInput, address, askAddress: true, error: ADDRESS_HELP };
+      const counter = `address-lookup:${lo.slug}`;
+      if ((await countToday(counter)) > ADDRESS_LOOKUPS_PER_DAY)
+        return {
+          mls: mlsInput,
+          address,
+          askAddress: true,
+          error: `That's the ${ADDRESS_LOOKUPS_PER_DAY} address lookups for today. Try again tomorrow.`,
+        };
+      let results: SourceListing[];
+      try {
+        results = await findByAddress(address);
+      } catch (err) {
+        if (!(err instanceof UnreadableAddressError)) throw err;
+        await uncountToday(counter);
+        return { mls: mlsInput, address, askAddress: true, error: `We couldn't read that address. ${ADDRESS_HELP}` };
+      }
       listing = results.find((l) => mls && l.mlsNumber && normalizeMls(l.mlsNumber) === mls) ?? results[0] ?? null;
       if (!listing)
         return {

@@ -183,8 +183,15 @@ export const mlsIndex = {
 };
 
 /** Adds one to today's (UTC) counter for `name` and returns the new count. */
+const todayKey = (name: string) => `count:${name}:${new Date().toISOString().slice(0, 10)}`;
+
+/** Gives back one use counted by countToday (e.g. a lookup RentCast rejected). */
+export async function uncountToday(name: string): Promise<void> {
+  if (redis) await redis.decr(todayKey(name));
+}
+
 export async function countToday(name: string): Promise<number> {
-  const key = `count:${name}:${new Date().toISOString().slice(0, 10)}`;
+  const key = todayKey(name);
   if (redis) {
     const n = await redis.incr(key);
     if (n === 1) await redis.expire(key, 2 * 86_400);
