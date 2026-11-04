@@ -14,6 +14,8 @@ export function BuildForm({ slug, token, photos }: { slug: string; token: string
   return (
     <div className="build">
       <form action={find} className="build-search">
+        <input type="hidden" name="prevMls" value={state.mls ?? ""} />
+        <input type="hidden" name="prevAddress" value={state.address ?? ""} />
         <label className="field">
           <span className="field-label">MLS number</span>
           <input
@@ -26,22 +28,20 @@ export function BuildForm({ slug, token, photos }: { slug: string; token: string
             autoFocus
           />
         </label>
-        {state.askAddress ? (
-          <label className="field">
-            <span className="field-label">Property address</span>
-            <input
-              name="address"
-              defaultValue={state.address}
-              key={`addr-${state.address ?? ""}`}
-              placeholder="123 Main St, Austin, TX 78704"
-              autoComplete="off"
-            />
-            <span className="field-hint">
-              We look up MLS numbers in the listings we pull twice a week, so very new or older listings may not be
-              there yet. The address finds it directly.
-            </span>
-          </label>
-        ) : null}
+        <label className="field">
+          <span className="field-label">Property address</span>
+          <input
+            name="address"
+            defaultValue={state.address}
+            key={`addr-${state.address ?? ""}`}
+            placeholder="123 Main St, Austin, TX 78704"
+            autoComplete="off"
+          />
+          <span className="field-hint">
+            Include the city, state and ZIP. We try the MLS # first and use the address when the listing isn&apos;t in
+            our search area yet, so filling in both saves a step.
+          </span>
+        </label>
         <div>
           <button className="pill pill-lg" disabled={finding || building}>
             {finding ? "Looking it up…" : "Find listing"}
