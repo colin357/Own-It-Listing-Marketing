@@ -198,7 +198,8 @@ export function buildEmails(l: Listing, lo: LoanOfficer, url = l.listingUrl): Em
     // 5. Financing spotlight, co-branded with the loan officer.
     if (programs || pay) {
       const rows = programs?.scenarios
-        .filter((s) => s.id !== "conv-20")
+        // Keep the email short: skip 20% down when the low-down option is there.
+        .filter((s, _, all) => s.id !== "conv-20" || !all.some((o) => o.id === "conv-low"))
         .map((s) => {
           const y1 = s.concession?.schedule[0];
           const year1 = y1 ? ` (${formatPrice(Math.round(y1.total))}/mo in year 1 with the ${s.concession!.type} buydown)` : "";

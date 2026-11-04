@@ -3,8 +3,8 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveConcessionAction } from "@/app/l/[slug]/actions";
-import { BUYDOWNS, closingCostCredit, concessionEffect, type ScenarioBase } from "@/lib/concessions";
-import { BUYDOWN_TYPES, type BuydownType, type Concession } from "@/lib/types";
+import { BUYDOWNS, closingCostCredit, concessionEffect, offeredBuydowns, type ScenarioBase } from "@/lib/concessions";
+import type { BuydownType, Concession } from "@/lib/types";
 
 export type CalculatorScenario = ScenarioBase & { id: string; name: string; detail: string };
 
@@ -34,13 +34,16 @@ export function ConcessionCalculator({
   const [status, setStatus] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  // Luxury listings don't offer temporary buydowns.
+  const types = offeredBuydowns(price);
+
   const effectsFor = (t: BuydownType) =>
     scenarios.map((s) => ({ s, e: concessionEffect(s, price, { amount: t === "closing-costs" ? closingCostCredit(price) : 0, type: t }) }));
 
   // A one-line teaser per option, from the best loan it's available on.
   const teasers = useMemo(() => {
     const out = {} as Record<BuydownType, { cost: string; saves: string }>;
-    for (const t of BUYDOWN_TYPES) {
+    for (const t of types) {
       const ok = effectsFor(t).filter(({ e }) => e.available);
       if (!ok.length) {
         out[t] = { cost: "", saves: "" };
@@ -83,7 +86,7 @@ export function ConcessionCalculator({
       <div className="calc-step">
         <p className="field-label">Pick one</p>
         <div className="calc-types" role="radiogroup" aria-label="Seller incentive">
-          {BUYDOWN_TYPES.map((t) => (
+          {types.map((t) => (
             <button
               key={t}
               type="button"

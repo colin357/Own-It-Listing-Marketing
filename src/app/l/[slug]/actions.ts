@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { listings } from "@/lib/store";
 import { normalizeBuydown } from "@/lib/validate";
-import { offerAmount } from "@/lib/concessions";
+import { offerAmount, offeredBuydowns } from "@/lib/concessions";
 import { getKit } from "@/lib/listings";
 import { programOptions } from "@/lib/mortgage";
 import type { Concession } from "@/lib/types";
@@ -42,6 +42,7 @@ export async function saveConcessionAction(slug: string, type: string): Promise<
   if (type !== "none") {
     const buydown = normalizeBuydown(type);
     if (!buydown) return { error: "Pick an option." };
+    if (!offeredBuydowns(listing.price).includes(buydown)) return { error: "Temporary buydowns aren't offered on Luxury listings." };
     const kit = await getKit(slug);
     const programs = kit ? programOptions({ ...kit.listing, concession: undefined }, kit.lo) : null;
     concession = { amount: offerAmount(buydown, programs?.scenarios ?? [], listing.price), type: buydown };

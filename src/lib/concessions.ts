@@ -1,4 +1,4 @@
-import type { BuydownType, Concession, Listing } from "./types";
+import { BUYDOWN_TYPES, type BuydownType, type Concession, type Listing } from "./types";
 import { principalAndInterest } from "./amortize";
 
 /**
@@ -15,8 +15,8 @@ export type Program = "conventional" | "fha" | "va";
 export const CLOSING_COST_PCT = 3;
 /** Rule of thumb: one discount point (1% of the loan) lowers the rate about 0.25%. */
 export const RATE_CUT_PER_POINT = 0.25;
-/** Discount points the seller buys for a permanent buydown (2 points ≈ 0.5% off the rate). */
-export const PERMANENT_POINTS = 2;
+/** Discount points the seller buys for a permanent buydown (1 point ≈ 0.25% off the rate, the most we show on any listing). */
+export const PERMANENT_POINTS = 1;
 /** No loan type allows more than this (Conventional with 25%+ down). */
 export const MAX_CONCESSION_PCT = 9;
 
@@ -24,12 +24,24 @@ export const BUYDOWNS: Record<BuydownType, { label: string; steps?: number[]; bl
   "2-1": { label: "2-1 buydown", steps: [2, 1], blurb: "Rate 2% lower in year 1 and 1% lower in year 2" },
   "1-0": { label: "1-0 buydown", steps: [1], blurb: "Rate 1% lower for the first year" },
   "3-2-1": { label: "3-2-1 buydown", steps: [3, 2, 1], blurb: "Rate 3%, 2% and 1% lower over the first three years" },
-  permanent: { label: "Permanent buydown", blurb: "Rate about 0.5% lower for the life of the loan" },
+  permanent: { label: "Permanent buydown", blurb: `Rate about ${PERMANENT_POINTS * RATE_CUT_PER_POINT}% lower for the life of the loan` },
   "closing-costs": { label: "Closing costs", blurb: "Seller pays about 3% toward the buyer's closing costs" },
 };
 
 export function isTemporary(type: BuydownType): boolean {
   return !!BUYDOWNS[type].steps;
+}
+
+/** Listings priced over this are "Luxury": 20% and 30% down conventional plus VA, no FHA, no temporary buydowns. */
+export const LUXURY_MIN_PRICE = 900_000;
+
+export function isLuxury(price: number): boolean {
+  return price > LUXURY_MIN_PRICE;
+}
+
+/** The seller incentives offered at this price: Luxury listings get no temporary (2-1, 1-0, 3-2-1) buydowns. */
+export function offeredBuydowns(price: number): BuydownType[] {
+  return BUYDOWN_TYPES.filter((t) => !(isLuxury(price) && isTemporary(t)));
 }
 
 /**
@@ -200,6 +212,7 @@ export function offerAmount(type: BuydownType, scenarios: ScenarioBase[], price:
 export function activeConcession(l: Listing): Concession | null {
   const c = l.concession;
   if (!c?.type) return null;
+  if (!offeredBuydowns(l.price).includes(c.type)) return null;
   if (l.status === "just-sold" || l.status === "under-contract") return null;
   return c;
 }
@@ -228,7 +241,7 @@ export function concessionDisclaimer(c: Concession): string {
   const what = steps
     ? `Seller-paid ${c.type} temporary buydown: rate ${steps.map((s, i) => `${s}% lower in year ${i + 1}`).join(", ")}, then the note-rate payment shown; buyer must qualify at the note rate.`
     : c.type === "permanent"
-      ? `Seller-paid permanent buydown assumes ${PERMANENT_POINTS} discount points lowering the rate about ${PERMANENT_POINTS * RATE_CUT_PER_POINT}%; pricing varies by lender.`
+      ? `Seller-paid permanent buydown assumes ${PERMANENT_POINTS} discount point${PERMANENT_POINTS === 1 ? "" : "s"} lowering the rate about ${PERMANENT_POINTS * RATE_CUT_PER_POINT}%; pricing varies by lender.`
       : `Seller credit of ${dollars(c.amount)} toward closing costs.`;
   return `${what} Seller concessions are subject to loan program limits, the purchase contract and lender approval.`;
 }

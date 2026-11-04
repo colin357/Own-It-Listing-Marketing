@@ -1,6 +1,6 @@
 import type { Agent, BuydownType, Concession, Financing, Listing, ListingStatus, LoanOfficer, OpenHouse, PaymentSettings } from "./types";
 import { BUYDOWN_TYPES, LISTING_STATUSES } from "./types";
-import { closingCostCredit } from "./concessions";
+import { closingCostCredit, offeredBuydowns } from "./concessions";
 import { slugify } from "./format";
 
 /**
@@ -99,6 +99,10 @@ function parseConcession(raw: Raw, price: number | undefined, issues: string[], 
     issues.push(`buydown must be one of ${BUYDOWN_TYPES.join(", ")} or none`);
     return undefined;
   }
+  if (price != null && !offeredBuydowns(price).includes(type)) {
+    issues.push(`buydown ${type} isn't offered on Luxury listings (over $900,000); use permanent, closing-costs or none`);
+    return undefined;
+  }
   if (type === "closing-costs") return { amount: Math.round(amount && amount > 0 ? amount : closingCostCredit(price ?? 0)), type };
   // Buydown costs are worked out per loan, so no amount is needed.
   return { amount: 0, type };
@@ -169,7 +173,7 @@ export function parseListingInput(raw: Raw, existing?: Listing): Omit<Listing, "
     if (bad.length) issues.push(`${bad.join(", ")} must be an annual percentage like 6.5`);
   }
 
-  const concession = parseConcession(raw, num(raw.price), issues, existing?.concession);
+  const concession = parseConcession(raw, num(raw.price) ?? existing?.price, issues, existing?.concession);
 
   const listing = {
     slug: str(raw.slug) ? slugify(String(raw.slug)) : existing?.slug,

@@ -4,6 +4,7 @@ import { principalAndInterest } from "./amortize";
 import {
   activeConcession,
   CLOSING_COST_PCT,
+  isLuxury,
   concessionDisclaimer,
   concessionEffect,
   type ConcessionEffect,
@@ -79,6 +80,7 @@ export const APR_FEES_PCT = 1;
 export const GUIDELINES: Record<string, { minCredit: number; maxDti: number; bestFor: string }> = {
   "conv-low": { minCredit: 620, maxDti: 45, bestFor: "Good credit and some savings" },
   "conv-20": { minCredit: 620, maxDti: 45, bestFor: "No mortgage insurance, lowest payment" },
+  "conv-30": { minCredit: 620, maxDti: 45, bestFor: "Lowest payment and smallest loan" },
   fha: { minCredit: 580, maxDti: 50, bestFor: "Lower credit scores and smaller savings" },
   va: { minCredit: 620, maxDti: 50, bestFor: "Eligible veterans and service members" },
 };
@@ -193,7 +195,7 @@ function inputs(l: Listing, lo: LoanOfficer) {
   return { i, annualTaxes, annualInsurance, taxesEstimated: f?.annualTaxes == null, insuranceEstimated: f?.annualInsurance == null };
 }
 
-function conventional(i: Inputs, id: string, downPct: number): Scenario {
+function conventional(i: Inputs, id: string, downPct: number, name = "Conventional"): Scenario {
   const downPayment = i.price * (downPct / 100);
   const loanAmount = i.price - downPayment;
   const principalInterest = principalAndInterest(loanAmount, i.ratePct);
@@ -202,7 +204,7 @@ function conventional(i: Inputs, id: string, downPct: number): Scenario {
   return {
     id,
     program: "conventional",
-    name: "Conventional",
+    name,
     detail: `${downPct}% down`,
     downPct,
     downPayment,
@@ -273,6 +275,16 @@ function va(i: Inputs): Scenario {
   };
 }
 
+/**
+ * The loans shown for a listing. Luxury listings (over $900,000) show 20% and
+ * 30% down plus VA, and no FHA; others show 10% and 20% down plus FHA (and VA
+ * where all four programs are listed).
+ */
+function baseScenarios(i: Inputs, withVa: boolean): Scenario[] {
+  if (isLuxury(i.price)) return [conventional(i, "conv-20", 20, "Luxury"), conventional(i, "conv-30", 30, "Luxury"), va(i)];
+  return [conventional(i, "conv-low", 10), conventional(i, "conv-20", 20), fha(i), ...(withVa ? [va(i)] : [])];
+}
+
 function buildDisclaimer(
   l: Listing,
   scenarios: Scenario[],
@@ -310,11 +322,11 @@ function withConcession<T extends Scenario>(l: Listing, s: T): T {
   return { ...s, ratePct: e.ratePct, aprPct: e.aprPct, principalInterest: e.principalInterest, total: e.total, cashToClose: e.cashToClose, concession: e };
 }
 
-/** Returns the three PITI scenarios, or null when there's no rate or payments are hidden. */
+/** Returns the three PITI scenarios (see baseScenarios), or null when there's no rate or payments are hidden. */
 export function paymentOptions(l: Listing, lo: LoanOfficer): PaymentOptions | null {
   const x = inputs(l, lo);
   if (!x) return null;
-  const scenarios = [conventional(x.i, "conv-low", 10), conventional(x.i, "conv-20", 20), fha(x.i)].map((s) => withConcession(l, s));
+  const scenarios = baseScenarios(x.i, false).map((s) => withConcession(l, s));
   return {
     scenarios,
     annualTaxes: x.annualTaxes,
@@ -343,11 +355,11 @@ export interface ProgramOptions extends PaymentOptions {
   cashNote: string;
 }
 
-/** Four loan programs (incl. VA) with cash to close and qualification rules of thumb. */
+/** Four loan programs incl. VA (three for Luxury listings) with cash to close and qualification rules of thumb. */
 export function programOptions(l: Listing, lo: LoanOfficer): ProgramOptions | null {
   const x = inputs(l, lo);
   if (!x) return null;
-  const scenarios: Program[] = [conventional(x.i, "conv-low", 10), conventional(x.i, "conv-20", 20), fha(x.i), va(x.i)].map((base) => {
+  const scenarios: Program[] = baseScenarios(x.i, true).map((base) => {
     const s = withConcession(l, base);
     const g = GUIDELINES[s.id];
     return { ...s, ...g, incomeNeeded: (s.total * 12) / (g.maxDti / 100) };
