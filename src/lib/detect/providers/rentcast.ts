@@ -83,6 +83,30 @@ function pickContact(c: RentcastContact) {
   return { phone: c.phone || undefined, email: c.email || undefined, website: c.website || undefined };
 }
 
+/**
+ * One feed page, with a 30s timeout so one slow request can't stall the whole
+ * run, and one retry after a rate limit (429), server error or timeout.
+ */
+async function fetchWithRetry(url: string, apiKey: string): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const res = await fetch(url, {
+        headers: { "X-Api-Key": apiKey, Accept: "application/json" },
+        cache: "no-store",
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (attempt === 0 && (res.status === 429 || res.status >= 500)) {
+        await new Promise((r) => setTimeout(r, 3000));
+        continue;
+      }
+      return res;
+    } catch (err) {
+      if (attempt > 0) throw err;
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+  }
+}
+
 export function rentcastProvider(apiKey: string): ListingProvider {
   return {
     name: "rentcast",
@@ -100,10 +124,7 @@ export function rentcastProvider(apiKey: string): ListingProvider {
           limit: String(PAGE),
           offset: String(page * PAGE),
         });
-        const res = await fetch(`${BASE}?${params}`, {
-          headers: { "X-Api-Key": apiKey, Accept: "application/json" },
-          cache: "no-store",
-        });
+        const res = await fetchWithRetry(`${BASE}?${params}`, apiKey);
         requests++;
         if (!res.ok) throw new Error(`RentCast ${res.status} for ${metro.name}: ${(await res.text()).slice(0, 200)}`);
         const rows = (await res.json()) as RentcastListing[];

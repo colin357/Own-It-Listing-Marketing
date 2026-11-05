@@ -5,10 +5,10 @@ import { formatNumber, slugify } from "../format";
 import type { Listing, LoanOfficer } from "../types";
 import { AUTO_CONFIDENCE, buildMatcher, nameParts, type Match } from "./match";
 import { getMetros, getRoster } from "./roster";
-import { listingProvider, lookupPhotos, photoSource, type PhotoResult } from "./providers";
+import { listingProvider, lookupPhotos, photoSource } from "./providers";
+import { applyPhotos, processPhotoQueue, queuePhotos } from "./photo-queue";
 import type { Detection, DetectionRun, SourceListing } from "./types";
 import { refreshMarketRates } from "../rates";
-import { sendDigests } from "../digest";
 import { indexListings } from "./mls";
 
 /** Loan officer record for a roster/metro name, matched on first + last name. */
@@ -111,16 +111,6 @@ async function notify(origin: string, listing: Listing, lo: LoanOfficer, det: De
   }
 }
 
-function applyPhotos(l: SourceListing, p?: PhotoResult): SourceListing {
-  if (!p) return l;
-  return {
-    ...l,
-    photos: l.photos.length ? l.photos : p.photos,
-    description: l.description ?? p.description,
-    ...(p.listingUrl ? { listingUrl: p.listingUrl } : {}),
-  };
-}
-
 export interface RunOptions {
   /** Look back this many days (overlap protects against a missed run). */
   days?: number;
@@ -130,18 +120,14 @@ export interface RunOptions {
 }
 
 /**
- * The cron function is killed at 300s. Keep the photo scrapes inside this
- * budget so there is always time left to save kits and email loan officers.
+ * The function is killed at 300s. After the feed and kit creation, the run
+ * works the photo queue until this point; whatever is left continues in
+ * /api/cron/photos every 5 minutes.
  */
-const RUN_BUDGET_MS = 240_000;
-/** Time kept back after a photo scrape for kit creation, emails and saving the run. */
-const RESERVE_MS = 60_000;
+const RUN_BUDGET_MS = 250_000;
 
-/** Apify timeout (seconds) that still fits the budget, or 0 when there isn't room for one. */
-function photoTimeout(startMs: number): number {
-  const left = Math.floor((startMs + RUN_BUDGET_MS - RESERVE_MS - Date.now()) / 1000) - 20;
-  return left >= 30 ? Math.min(180, left) : 0;
-}
+/** Metros fetched from the listings feed at once. */
+const FEED_CONCURRENCY = 4;
 
 /** A listing counts as new for this many days after it first appears. */
 export const DEFAULT_DAYS = 7;
@@ -171,24 +157,36 @@ export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin
   let requests = 0;
   let scanned = 0;
 
-  for (const metro of metros) {
-    try {
-      const res = await provider.fetchNewListings(metro, days);
-      requests += res.requests;
-      for (const l of res.listings) {
-        // Metros overlap (e.g. Frisco and Carrollton), so the same listing can come back twice.
-        if (seen.has(l.id)) continue;
-        seen.add(l.id);
-        scanned++;
-        scannedListings.push(l);
-        const m = match(l);
-        if (!m) continue;
-        const slug = slugify(`${l.provider}-${l.id}`);
-        if (await detections.get(slug)) continue;
-        found.push({ listing: l, match: m, slug });
+  // A few metros at a time: one at a time takes minutes once there are many
+  // metros, and RentCast is fine with a handful of requests in parallel.
+  const feeds: { listings: SourceListing[]; requests: number }[] = new Array(metros.length);
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(FEED_CONCURRENCY, metros.length) }, async () => {
+      while (next < metros.length) {
+        const i = next++;
+        try {
+          feeds[i] = await provider.fetchNewListings(metros[i], days);
+        } catch (err) {
+          errors.push((err as Error).message);
+        }
       }
-    } catch (err) {
-      errors.push((err as Error).message);
+    }),
+  );
+  for (const res of feeds) {
+    if (!res) continue;
+    requests += res.requests;
+    for (const l of res.listings) {
+      // Metros overlap (e.g. Frisco and Carrollton), so the same listing can come back twice.
+      if (seen.has(l.id)) continue;
+      seen.add(l.id);
+      scanned++;
+      scannedListings.push(l);
+      const m = match(l);
+      if (!m) continue;
+      const slug = slugify(`${l.provider}-${l.id}`);
+      if (await detections.get(slug)) continue;
+      found.push({ listing: l, match: m, slug });
     }
   }
 
@@ -197,18 +195,6 @@ export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin
     await indexListings(scannedListings);
   } catch (err) {
     errors.push(`MLS index update failed: ${(err as Error).message}`);
-  }
-
-  // Photos only for matches, which keeps scraping to a handful of homes a day.
-  let photos = new Map<string, PhotoResult>();
-  if (photoSource() && found.length && !dryRun) {
-    const timeoutSec = photoTimeout(startMs);
-    try {
-      if (!timeoutSec) throw new Error("skipped, the listings feed used up the time budget");
-      photos = await lookupPhotos(found.map((f) => f.listing), timeoutSec);
-    } catch (err) {
-      errors.push(`Photo lookup failed: ${(err as Error).message}`);
-    }
   }
 
   const now = new Date().toISOString();
@@ -226,7 +212,7 @@ export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin
       rosterAgent: f.match.agent,
       loanOfficerName: loName,
       loanOfficerSlug: lo?.slug,
-      listing: applyPhotos(f.listing, photos.get(f.listing.id)),
+      listing: f.listing,
       createdAt: now,
       updatedAt: now,
     };
@@ -244,18 +230,14 @@ export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin
         }
       }
       await detections.save(det);
+      // Queue the photo lookup right away, so a run cut off part way still gets its photos.
+      if (photoSource()) await queuePhotos([det.slug]);
     }
     results.push(det);
   }
 
   if (!dryRun) {
     const open = await detections.list();
-
-    // Zillow often shows a listing's photos a day or two after it hits the feed,
-    // so keep retrying for a week for kits still without photos (only while time is left).
-    const backfill = await backfillPhotos({ startMs, maxAgeDays: 7, open });
-    photosAdded = backfill.added;
-    errors.push(...backfill.errors);
 
     // Confident matches that were waiting for their loan officer to be added.
     for (const det of open) {
@@ -279,15 +261,19 @@ export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin
     }
   }
 
-  // One email per loan officer with every kit they haven't been sent yet.
-  let emailsSent = 0;
-  if (!dryRun) {
+  // Photos load in the background (photo-queue.ts): queue every new match, plus
+  // recent kits still without photos, then work the queue while there's time.
+  let queued = 0;
+  if (!dryRun && photoSource()) {
     try {
-      const mail = await sendDigests(origin);
-      emailsSent = mail.sent;
-      errors.push(...mail.errors);
+      const gaps = await kitsMissingPhotos(7);
+      await queuePhotos([...results.map((d) => d.slug), ...gaps.map((g) => g.det.slug)]);
+      const q = await processPhotoQueue({ deadline: startMs + RUN_BUDGET_MS });
+      photosAdded = q.added;
+      queued = q.queued;
+      errors.push(...q.errors);
     } catch (err) {
-      errors.push(`Emails failed: ${(err as Error).message}`);
+      errors.push(`Photo queue failed: ${(err as Error).message}`);
     }
   }
 
@@ -302,7 +288,8 @@ export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin
     matches: results.length,
     created,
     photosAdded,
-    emailsSent,
+    photosQueued: queued,
+    emailsSent: 0,
     review: results.filter((d) => d.status === "review").length,
     waitingLo: results.filter((d) => d.status === "waiting-lo").length,
     errors,
@@ -329,50 +316,20 @@ export async function kitsMissingPhotos(maxAgeDays?: number, open?: Detection[])
   return out.sort((a, b) => b.det.createdAt.localeCompare(a.det.createdAt));
 }
 
-/** Homes per Zillow lookup, small enough that each one finishes well inside its timeout. */
-const PHOTO_BATCH = 10;
-
 /**
- * Looks up Zillow photos (via Apify) for kits that have none. Uses no listings
- * feed (RentCast) requests. Works in batches and stops when the time budget
- * runs out, so it can simply be run again to continue.
+ * "Fetch missing photos" in admin: queues every kit without photos for a
+ * lookup right now and works the queue for up to ~4 minutes. Anything not
+ * done by then keeps loading in the background (/api/cron/photos).
+ * Uses no listings feed (RentCast) requests.
  */
-export async function backfillPhotos({
-  startMs = Date.now(),
-  maxAgeDays,
-  open,
-}: { startMs?: number; maxAgeDays?: number; open?: Detection[] } = {}) {
-  const gaps = await kitsMissingPhotos(maxAgeDays, open);
-  const result = { missing: gaps.length, tried: 0, added: 0, errors: [] as string[] };
+export async function backfillPhotos() {
+  const startMs = Date.now();
+  const gaps = await kitsMissingPhotos();
+  const result = { missing: gaps.length, added: 0, queued: 0, errors: [] as string[] };
   if (!gaps.length || !photoSource()) return result;
-  for (let i = 0; i < gaps.length; i += PHOTO_BATCH) {
-    const timeoutSec = photoTimeout(startMs);
-    if (!timeoutSec) break;
-    const batch = gaps.slice(i, i + PHOTO_BATCH);
-    result.tried += batch.length;
-    try {
-      const found = await lookupPhotos(batch.map((g) => g.det.listing), timeoutSec);
-      for (const { det, kit } of batch) {
-        const p = found.get(det.listing.id);
-        if (!p?.photos.length) continue;
-        // Re-read so a photo the agent just uploaded isn't overwritten.
-        const latest = await listings.get(kit.slug);
-        if (!latest || latest.photos.length) continue;
-        await listings.save({
-          ...latest,
-          photos: p.photos,
-          description: latest.description ?? p.description,
-          listingUrl: latest.listingUrl ?? p.listingUrl,
-          updatedAt: new Date().toISOString(),
-        });
-        await detections.save({ ...det, listing: applyPhotos(det.listing, p), updatedAt: new Date().toISOString() });
-        result.added++;
-      }
-    } catch (err) {
-      result.errors.push(`Photo retry failed: ${(err as Error).message}`);
-    }
-  }
-  return result;
+  await queuePhotos(gaps.map((g) => g.det.slug), Date.now(), true);
+  const q = await processPhotoQueue({ deadline: startMs + RUN_BUDGET_MS });
+  return { ...result, added: q.added, queued: q.queued + q.inFlight, errors: q.errors, busy: q.busy };
 }
 
 /** Approve a detection from the review queue (or one waiting on its loan officer). */

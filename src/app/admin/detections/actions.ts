@@ -12,7 +12,7 @@ export async function runNowAction(fd: FormData) {
   let msg: string;
   try {
     const { run } = await runDetection({ dryRun, origin: await siteUrl() });
-    msg = `${dryRun ? "Test run" : "Run"} done: ${run.listingsScanned} listings scanned, ${run.matches} new matches, ${run.created} kits created${run.errors.length ? `, ${run.errors.length} errors` : ""}.`;
+    msg = `${dryRun ? "Test run" : "Run"} done: ${run.listingsScanned} listings scanned, ${run.matches} new matches, ${run.created} kits created${run.photosQueued ? `, photos still loading in the background for ${run.photosQueued}` : ""}${run.errors.length ? `, ${run.errors.length} errors` : ""}.${dryRun ? "" : " Loan officer emails go out at the next 7 AM (Mon/Thu), or send them now from Emails."}`;
   } catch (err) {
     msg = `Run failed: ${(err as Error).message}`;
   }
@@ -25,15 +25,12 @@ export async function fetchPhotosAction() {
   let msg: string;
   try {
     const r = await backfillPhotos();
-    const left = r.missing - r.added;
     msg = !r.missing
       ? "Every kit already has photos."
-      : `Checked Zillow for ${r.tried} of ${r.missing} kits without photos and added photos to ${r.added}. ` +
-        (r.tried < r.missing
-          ? `Ran out of time; press Fetch missing photos again to check the other ${r.missing - r.tried}.`
-          : left
-            ? `${left} still have none on Zillow yet; the Monday and Thursday runs keep trying for a week.`
-            : "All done.") +
+      : `Checked Zillow for kits without photos and added photos to ${r.added} of ${r.missing}. ` +
+        (r.queued
+          ? `The other ${r.queued} keep loading in the background (every 5 minutes); kits Zillow doesn't show yet are retried for a week.`
+          : "All done.") +
         (r.errors.length ? ` ${r.errors.join(" ")}` : "");
   } catch (err) {
     msg = `Photo lookup failed: ${(err as Error).message}`;

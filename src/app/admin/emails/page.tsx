@@ -36,8 +36,8 @@ export default async function EmailsPage({ searchParams }: { searchParams: Promi
         </div>
       </div>
       <p className="muted small">
-        After each Monday and Thursday run, every loan officer gets one email with the kits created for their agents since
-        their last email. Sending from: <strong>{ready ? process.env.MAIL_FROM : "not set up yet"}</strong>.{" "}
+        At 7 AM Eastern on any day with new kits (after the listing photos have loaded), every loan officer gets one email
+        with the kits created for their agents since their last email. Sending from: <strong>{ready ? process.env.MAIL_FROM : "not set up yet"}</strong>.{" "}
         {digests.length
           ? `${total} kit${total === 1 ? "" : "s"} waiting for ${digests.length} loan officer${digests.length === 1 ? "" : "s"}.`
           : "Nothing waiting to send, so a test email uses the newest kits."}
