@@ -22,6 +22,14 @@ export default async function RosterPage() {
       <p className="muted small">
         {agents.length} agents across {perLo.size} loan officers · {metros.length} metros
       </p>
+      <div className="form-actions" style={{ margin: "16px 0 24px" }}>
+        <a href="/admin/roster/roster.csv" className="btn btn-ghost btn-small" download>
+          Download roster CSV
+        </a>
+        <a href="/admin/roster/metros.csv" className="btn btn-ghost btn-small" download>
+          Download metros CSV
+        </a>
+      </div>
       <RosterForm />
 
       {names.length ? (
