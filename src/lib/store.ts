@@ -199,3 +199,71 @@ export async function countToday(name: string): Promise<number> {
   }
   return 1;
 }
+
+/**
+ * Detections waiting for listing photos, scored by when to try next (ms).
+ * Locally it's one JSON document.
+ */
+const PHOTO_QUEUE = "photo-queue";
+
+async function readQueueDoc(): Promise<Record<string, number>> {
+  return (await documents.get<Record<string, number>>(PHOTO_QUEUE)) ?? {};
+}
+
+export const photoQueue = {
+  /** Queue slugs to try at `dueAt`. Slugs already queued keep their time unless `replace`. */
+  async add(slugs: string[], dueAt: number, replace = false): Promise<void> {
+    if (!slugs.length) return;
+    if (redis) {
+      const members = slugs.map((member) => ({ score: dueAt, member }));
+      const [first, ...rest] = members;
+      if (replace) await redis.zadd(PHOTO_QUEUE, first, ...rest);
+      else await redis.zadd(PHOTO_QUEUE, { nx: true }, first, ...rest);
+      return;
+    }
+    const q = await readQueueDoc();
+    for (const s of slugs) if (replace || q[s] === undefined) q[s] = dueAt;
+    await documents.set(PHOTO_QUEUE, q);
+  },
+  /** Slugs due at or before `at`, oldest first. */
+  async due(at: number, limit: number): Promise<string[]> {
+    if (redis) return redis.zrange<string[]>(PHOTO_QUEUE, 0, at, { byScore: true, offset: 0, count: limit });
+    const q = await readQueueDoc();
+    return Object.entries(q)
+      .filter(([, t]) => t <= at)
+      .sort((a, b) => a[1] - b[1])
+      .slice(0, limit)
+      .map(([s]) => s);
+  },
+  async count(until = Infinity): Promise<number> {
+    if (redis) return redis.zcount(PHOTO_QUEUE, "-inf", Number.isFinite(until) ? until : "+inf");
+    return Object.values(await readQueueDoc()).filter((t) => t <= until).length;
+  },
+  async remove(slugs: string[]): Promise<void> {
+    if (!slugs.length) return;
+    if (redis) {
+      await redis.zrem(PHOTO_QUEUE, ...slugs);
+      return;
+    }
+    const q = await readQueueDoc();
+    for (const s of slugs) delete q[s];
+    await documents.set(PHOTO_QUEUE, q);
+  },
+};
+
+/**
+ * A short-lived lock so two invocations (the 3 AM run and the photo cron)
+ * don't work the same queue at once. Always granted without Redis.
+ */
+export const locks = {
+  async acquire(name: string, ttlSec: number): Promise<string | null> {
+    const token = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    if (!redis) return token;
+    const ok = await redis.set(`lock:${name}`, token, { nx: true, ex: ttlSec });
+    return ok ? token : null;
+  },
+  async release(name: string, token: string): Promise<void> {
+    if (!redis) return;
+    if ((await redis.get<string>(`lock:${name}`)) === token) await redis.del(`lock:${name}`);
+  },
+};

@@ -6,6 +6,8 @@ import { ASSETS, assetsFor, isAssetName, isPrintAsset } from "@/lib/render/templ
 
 // Images are cached at the CDN; the kit page appends ?v=<updatedAt> so edits bust the cache.
 const CACHE = "public, max-age=3600, s-maxage=604800, stale-while-revalidate=86400";
+// When the listing photos couldn't be fetched, the graphic falls back to no photo; don't keep that for a week.
+const SHORT_CACHE = "public, max-age=60, s-maxage=60";
 
 export async function GET(req: Request, ctx: RouteContext<"/l/[slug]/assets/[file]">) {
   const { slug, file } = await ctx.params;
@@ -21,14 +23,16 @@ export async function GET(req: Request, ctx: RouteContext<"/l/[slug]/assets/[fil
   const filename = assetFilename(kit.listing, name).replace(/\.png$/, `.${ext}`);
   const disposition = `${download ? "attachment" : "inline"}; filename="${filename}"`;
 
-  const [image] = await renderAssets(kit.listing, kit.lo, [name], originFromRequest(req) + buyerPagePath(slug));
+  const rendered = await renderAssets(kit.listing, kit.lo, [name], originFromRequest(req) + buyerPagePath(slug));
+  const [image] = rendered;
+  const cache = rendered.photosFailed ? SHORT_CACHE : CACHE;
   if (ext === "png") {
     return new Response(image.body, {
-      headers: { "Content-Type": "image/png", "Cache-Control": CACHE, "Content-Disposition": disposition },
+      headers: { "Content-Type": "image/png", "Cache-Control": cache, "Content-Disposition": disposition },
     });
   }
   const pdf = await pngToLetterPdf(await image.arrayBuffer(), `${ASSETS[name].label} – ${kit.listing.address}`);
   return new Response(Buffer.from(pdf), {
-    headers: { "Content-Type": "application/pdf", "Cache-Control": CACHE, "Content-Disposition": disposition },
+    headers: { "Content-Type": "application/pdf", "Cache-Control": cache, "Content-Disposition": disposition },
   });
 }

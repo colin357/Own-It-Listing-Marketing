@@ -64,9 +64,9 @@ export default async function DetectionsPage({ searchParams }: PageProps<"/admin
       </div>
 
       <p className="muted small">
-        Every Monday and Thursday morning we pull new listings around each metro, match the listing agent to your{" "}
+        Every Monday and Thursday at 3 AM Eastern we pull new listings around each metro, match the listing agent to your{" "}
         <Link href="/admin/roster">roster</Link> and build the kit. Confident matches become kits automatically;
-        close calls wait here for you.
+        close calls wait here for you. Listing photos load in the background after each run, and loan officers are emailed at 7 AM.
         {" "}
         Listings feed: <strong>{provider ? provider.name : "not set up (add RENTCAST_API_KEY)"}</strong> · Photos:{" "}
         <strong>{photos === "zillow" ? "Zillow via Apify" : photos === "webhook" ? "photo webhook" : "not set up (add APIFY_TOKEN)"}</strong>
@@ -142,7 +142,7 @@ export default async function DetectionsPage({ searchParams }: PageProps<"/admin
               <PendingButton
                 disabled={!photos}
                 pendingText="Fetching photos…"
-                note="Looking each home up on Zillow (no RentCast use). Takes up to about 4 minutes; keep this tab open."
+                note="Looking each home up on Zillow (no RentCast use). Takes up to about 4 minutes; anything left keeps loading in the background."
               >
                 Fetch missing photos
               </PendingButton>

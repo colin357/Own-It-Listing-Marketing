@@ -97,6 +97,9 @@ export interface Detection {
   listingSlug?: string;
   /** When the loan officer was emailed this kit. */
   emailedAt?: string;
+  /** Photo lookups that found nothing yet, and lookups that failed (photo-queue.ts). */
+  photoTries?: number;
+  photoErrors?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -113,6 +116,8 @@ export interface DetectionRun {
   created: number;
   /** Kits that were missing photos and got them on this run. */
   photosAdded: number;
+  /** Homes still waiting for photos when the run ended (they keep loading in the background). */
+  photosQueued?: number;
   /** Loan officers emailed their new kits. */
   emailsSent?: number;
   review: number;

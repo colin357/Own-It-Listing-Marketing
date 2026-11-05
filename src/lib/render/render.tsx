@@ -6,7 +6,11 @@ import { paymentOptions, programOptions } from "../mortgage";
 import { inlineImage, loadFonts, qrDataUrl } from "./resources";
 import { ASSETS, type AssetName, type RenderData } from "./templates";
 
-async function buildRenderData(listing: Listing, lo: LoanOfficer, listingLink?: string): Promise<RenderData> {
+async function buildRenderData(
+  listing: Listing,
+  lo: LoanOfficer,
+  listingLink?: string,
+): Promise<RenderData & { photosFailed: boolean }> {
   const colors = graphicColors(lo);
   const [photos, loHeadshot, agentHeadshot, logo, applyQr, listingQr] = await Promise.all([
     // Fetch a couple of spares so a broken URL doesn't leave a slot empty.
@@ -22,6 +26,7 @@ async function buildRenderData(listing: Listing, lo: LoanOfficer, listingLink?: 
     listing,
     lo,
     photos: usable.length ? usable : [null],
+    photosFailed: listing.photos.length > 0 && usable.length === 0,
     loHeadshot,
     agentHeadshot,
     logo,
@@ -43,12 +48,15 @@ export async function renderAssets(
   names: AssetName[],
   listingLink = listing.listingUrl,
   headers?: Record<string, string>,
-): Promise<ImageResponse[]> {
+): Promise<ImageResponse[] & { photosFailed: boolean }> {
   const [data, fonts] = await Promise.all([buildRenderData(listing, lo, listingLink), loadFonts()]);
-  return names.map((name) => {
+  const images = names.map((name) => {
     const a = ASSETS[name];
     return new ImageResponse(a.render(data), { width: a.width, height: a.height, fonts, headers });
   });
+  // The listing has photos but none could be fetched (photo host slow or down):
+  // callers should not cache this render for long.
+  return Object.assign(images, { photosFailed: data.photosFailed });
 }
 
 export function assetFilename(listing: Listing, name: AssetName): string {
