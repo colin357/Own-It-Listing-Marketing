@@ -27,6 +27,8 @@ export async function fetchPhotosAction() {
     const r = await backfillPhotos();
     msg = !r.missing
       ? "Every kit already has photos."
+      : "blocked" in r && r.blocked && !r.added
+        ? "Couldn't fetch photos: Apify's monthly usage limit is used up. Raise it in Apify (Settings → Usage & billing), then press Fetch missing photos again, or wait; photos resume on their own within 30 minutes."
       : `Checked Zillow for kits without photos and added photos to ${r.added} of ${r.missing}. ` +
         (r.queued
           ? `The other ${r.queued} keep loading in the background (every 5 minutes); kits Zillow doesn't show yet are retried for a week.`

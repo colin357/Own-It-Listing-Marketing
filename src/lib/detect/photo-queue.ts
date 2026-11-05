@@ -5,6 +5,7 @@ import { lookupPhotos, photoSource, type PhotoResult } from "./providers";
 import {
   abortZillowRun,
   ApifyBusyError,
+  ApifyLimitError,
   getZillowRun,
   matchItems,
   runFinished,
@@ -48,7 +49,11 @@ const BUSY_RETRY_MS = 60_000;
 /** After this many failed runs for a home, treat it like "not on Zillow yet" so it backs off. */
 const MAX_QUICK_ERRORS = 5;
 
+/** After Apify says the account is out of usage, check again this often (one request) until it works. */
+const LIMIT_RETRY_MS = 30 * 60_000;
+
 const RUNS_DOC = "photo-runs";
+const BLOCKED_DOC = "photo-blocked";
 const HOLD_DOC = "digest-hold";
 const LOCK = "photo-queue";
 
@@ -57,6 +62,18 @@ interface InFlight {
   datasetId: string;
   slugs: string[];
   startedAt: number;
+}
+
+/** Set while Apify refuses runs because the account is out of usage. */
+export interface PhotoBlock {
+  message: string;
+  since: number;
+  /** Next time a pass tries Apify again. */
+  retryAt: number;
+}
+
+export async function photoBlock(): Promise<PhotoBlock | null> {
+  return (await documents.get<PhotoBlock | null>(BLOCKED_DOC)) ?? null;
 }
 
 export interface QueueResult {
@@ -70,6 +87,8 @@ export interface QueueResult {
   errors: string[];
   /** Another pass was already working the queue. */
   busy?: boolean;
+  /** Apify is refusing runs (account out of usage); lookups are paused. */
+  blocked?: PhotoBlock;
 }
 
 export function applyPhotos(l: SourceListing, p?: PhotoResult): SourceListing {
@@ -144,12 +163,23 @@ async function settle(slug: string, p: PhotoResult | undefined, failed: boolean)
  * starts new ones for homes that are due, and waits on running ones in
  * between. Runs still going at the deadline are collected by the next pass.
  */
-export async function processPhotoQueue({ deadline }: { deadline: number }): Promise<QueueResult> {
+export async function processPhotoQueue({
+  deadline,
+  force = false,
+}: {
+  deadline: number;
+  /** Try Apify even while paused for its usage limit (the admin "Fetch missing photos" button). */
+  force?: boolean;
+}): Promise<QueueResult> {
   const result: QueueResult = { added: 0, started: 0, queued: 0, inFlight: 0, errors: [] };
   const source = photoSource();
   if (!source) return result;
 
   let runs = await inFlightRuns();
+  let block = await photoBlock();
+  if (block && !force && Date.now() < block.retryAt) {
+    return { ...result, blocked: block, queued: await photoQueue.count(), inFlight: runs.length };
+  }
   // Nothing to do: skip the lock and return (this is most 5-minute ticks).
   if (!runs.length && !(await photoQueue.count(Date.now()))) {
     result.queued = await photoQueue.count();
@@ -216,6 +246,10 @@ export async function processPhotoQueue({ deadline }: { deadline: number }): Pro
             const run = await startZillowRun(token, keep.map((d) => d.listing), RUN_TIMEOUT_SEC);
             runs.push({ runId: run.id, datasetId: run.datasetId, slugs, startedAt: Date.now() });
             await documents.set(RUNS_DOC, runs);
+            if (block) {
+              await documents.set(BLOCKED_DOC, null);
+              block = null;
+            }
           } else {
             // PHOTO_LOOKUP_URL webhook: answers right away, one home at a time.
             const found = await lookupPhotos(keep.map((d) => d.listing));
@@ -224,6 +258,18 @@ export async function processPhotoQueue({ deadline }: { deadline: number }): Pro
           result.started += keep.length;
           startedNow++;
         } catch (err) {
+          if (err instanceof ApifyLimitError) {
+            // Out of usage: no point trying every 5 minutes. Pause, check again in 30, and say so in admin.
+            const now = Date.now();
+            block = { message: (err as Error).message, since: block?.since ?? now, retryAt: now + LIMIT_RETRY_MS };
+            await documents.set(BLOCKED_DOC, block);
+            await photoQueue.add(slugs, now, true);
+            result.blocked = block;
+            result.errors.push(
+              "Photo lookups are paused: Apify says the account's monthly usage limit is used up. Raise it in Apify (Settings → Usage & billing) and photos resume on their own within 30 minutes.",
+            );
+            break;
+          }
           const busy = err instanceof ApifyBusyError;
           await photoQueue.add(slugs, Date.now() + (busy ? BUSY_RETRY_MS : ERROR_RETRY_MS), true);
           if (!busy) result.errors.push(`Photo lookup failed: ${(err as Error).message}`);
@@ -231,6 +277,7 @@ export async function processPhotoQueue({ deadline }: { deadline: number }): Pro
         }
       }
 
+      if (result.blocked && !runs.length) break;
       if (!runs.length && !(await photoQueue.count(Date.now()))) {
         // Homes put back after Apify said "busy" come due in a minute; wait for them if there's time.
         if (left() > BUSY_RETRY_MS + 45_000 && (await photoQueue.count(Date.now() + BUSY_RETRY_MS))) {
@@ -259,6 +306,8 @@ export async function processPhotoQueue({ deadline }: { deadline: number }): Pro
 /** True while homes from the latest run are still waiting on their first photo lookup. */
 export async function photosLoading(): Promise<boolean> {
   if ((await inFlightRuns()).length) return true;
+  // Paused for Apify's usage limit: photos won't arrive by themselves, so don't hold the LO emails for them.
+  if (await photoBlock()) return false;
   // First lookups are due now; homes Zillow didn't have yet are pushed out an hour or more.
   return (await photoQueue.count(Date.now() + 15 * 60_000)) > 0;
 }

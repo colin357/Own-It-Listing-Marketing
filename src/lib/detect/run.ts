@@ -328,8 +328,8 @@ export async function backfillPhotos() {
   const result = { missing: gaps.length, added: 0, queued: 0, errors: [] as string[] };
   if (!gaps.length || !photoSource()) return result;
   await queuePhotos(gaps.map((g) => g.det.slug), Date.now(), true);
-  const q = await processPhotoQueue({ deadline: startMs + RUN_BUDGET_MS });
-  return { ...result, added: q.added, queued: q.queued + q.inFlight, errors: q.errors, busy: q.busy };
+  const q = await processPhotoQueue({ deadline: startMs + RUN_BUDGET_MS, force: true });
+  return { ...result, added: q.added, queued: q.queued + q.inFlight, errors: q.errors, busy: q.busy, blocked: q.blocked };
 }
 
 /** Approve a detection from the review queue (or one waiting on its loan officer). */

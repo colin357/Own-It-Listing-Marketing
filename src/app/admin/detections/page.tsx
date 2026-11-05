@@ -2,6 +2,7 @@ import Link from "next/link";
 import { detections, loanOfficers } from "@/lib/store";
 import { formatPrice } from "@/lib/format";
 import { kitsMissingPhotos, lastRun, lastTestRun } from "@/lib/detect/run";
+import { photoBlock } from "@/lib/detect/photo-queue";
 import { PendingButton } from "@/components/admin/PendingButton";
 import { currentMarketRates } from "@/lib/rates";
 import { listingProvider, photoSource } from "@/lib/detect/providers";
@@ -22,12 +23,13 @@ export default async function DetectionsPage({ searchParams }: PageProps<"/admin
   const status = typeof sp.status === "string" ? sp.status : "";
   const msg = typeof sp.msg === "string" ? sp.msg : "";
   const all = await detections.list();
-  const [los, run, test, rates, noPhotos] = await Promise.all([
+  const [los, run, test, rates, noPhotos, block] = await Promise.all([
     loanOfficers.list(),
     lastRun(),
     lastTestRun(),
     currentMarketRates(),
     kitsMissingPhotos(undefined, all),
+    photoBlock(),
   ]);
   const rows = all.filter((d) => (status ? d.status === status : d.status !== "dismissed"));
   const count = (s: DetectionStatus) => all.filter((d) => d.status === s).length;
@@ -38,6 +40,17 @@ export default async function DetectionsPage({ searchParams }: PageProps<"/admin
   return (
     <>
       {msg ? <div className="alert alert-success">{msg}</div> : null}
+      {block ? (
+        <div className="alert alert-error">
+          <strong>Photo lookups are paused.</strong> Apify says the account&apos;s monthly usage limit is used up (since{" "}
+          {new Date(block.since).toLocaleString("en-US", { timeZone: "America/New_York", dateStyle: "medium", timeStyle: "short" })}{" "}
+          ET), so no Zillow photos can load. Raise the limit or plan in{" "}
+          <a href="https://console.apify.com/billing" target="_blank" rel="noreferrer">
+            Apify → Usage &amp; billing
+          </a>
+          . Photos resume on their own within 30 minutes of that, or press Fetch missing photos below.
+        </div>
+      ) : null}
       <div className="toolbar">
         <h1>New listings</h1>
         <form action={runNowAction} className="filters">

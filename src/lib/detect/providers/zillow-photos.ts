@@ -89,6 +89,11 @@ const actorInput = (listings: SourceListing[]) =>
 /** Apify answered with a limit (too many runs or not enough memory on the plan), so try again later. */
 export class ApifyBusyError extends Error {}
 
+/** The Apify account is out of usage (monthly limit or credit); nothing will run until that's raised. */
+export class ApifyLimitError extends Error {}
+
+const OUT_OF_USAGE = /hard limit|usage limit|platform-feature-disabled|not-enough-usage|insufficient|credit/i;
+
 async function apify<T>(token: string, path: string, init: RequestInit = {}, timeoutMs = 30_000): Promise<T> {
   const res = await fetch(`${API}${path}`, {
     ...init,
@@ -98,6 +103,8 @@ async function apify<T>(token: string, path: string, init: RequestInit = {}, tim
   });
   if (!res.ok) {
     const text = (await res.text()).slice(0, 200);
+    if ((res.status === 402 || res.status === 403) && OUT_OF_USAGE.test(text))
+      throw new ApifyLimitError(`Apify ${res.status}: ${text}`);
     if (res.status === 402 || res.status === 429) throw new ApifyBusyError(`Apify ${res.status}: ${text}`);
     throw new Error(`Apify ${res.status}: ${text}`);
   }
