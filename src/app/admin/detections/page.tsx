@@ -158,6 +158,13 @@ export default async function DetectionsPage({ searchParams }: PageProps<"/admin
                   </a>{" "}
                   <span className="muted small">
                     (LO {det.loanOfficerName}, found {new Date(det.createdAt).toLocaleDateString("en-US")})
+                    {det.photoNote ? (
+                      <>
+                        {" "}
+                        · {det.photoNote}
+                        {det.photoTries ? ` (tried ${det.photoTries}×)` : ""}
+                      </>
+                    ) : null}
                   </span>
                 </li>
               ))}

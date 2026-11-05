@@ -13,6 +13,8 @@ export function listingProvider(): ListingProvider | null {
 
 export interface PhotoResult {
   photos: string[];
+  /** Why no photos came back (e.g. "Zillow returned nothing for this address"), shown in admin. */
+  note?: string;
   description?: string;
   listingUrl?: string;
 }
