@@ -174,7 +174,7 @@ How a run works:
 - The listing agent is matched against the roster by name (nicknames like Will/William count), and
   only against agents whose loan officer works that area. A matching brokerage raises confidence and a
   different one lowers it.
-- **90%+ matches become kits automatically.** Lower-confidence matches, and names that match agents
+- **65%+ matches become kits automatically.** Lower-confidence matches, and names that match agents
   of two different loan officers, wait under **Admin → New listings** for a person to click
   "Create kit" or "Not a match".
 - **Photos and description** are scraped from the public Zillow listing (Apify actor
