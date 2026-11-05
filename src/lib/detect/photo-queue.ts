@@ -9,6 +9,7 @@ import {
   matchItems,
   runFinished,
   startZillowRun,
+  addressQueryFor,
   zillowRunItems,
 } from "./providers/zillow-photos";
 import type { Detection, SourceListing } from "./types";
@@ -56,6 +57,8 @@ interface InFlight {
   runId: string;
   datasetId: string;
   slugs: string[];
+  /** Address text sent to Zillow for each slug (it varies between retries). */
+  queries?: Record<string, string>;
   startedAt: number;
 }
 
@@ -121,14 +124,15 @@ async function settle(slug: string, p: PhotoResult | undefined, failed: boolean)
         });
       }
     }
-    await detections.save({ ...det, listing: applyPhotos(det.listing, p), updatedAt: now });
+    await detections.save({ ...det, listing: applyPhotos(det.listing, p), photoNote: undefined, updatedAt: now });
     await photoQueue.remove([slug]);
     return true;
   }
   const errors = (det.photoErrors ?? 0) + (failed ? 1 : 0);
   const quickRetry = failed && errors < MAX_QUICK_ERRORS;
   const tries = (det.photoTries ?? 0) + (quickRetry ? 0 : 1);
-  await detections.save({ ...det, photoTries: tries, photoErrors: errors, updatedAt: now });
+  const note = p?.note ?? (failed ? "The Zillow lookup didn't finish; retrying" : "Zillow returned nothing for this address");
+  await detections.save({ ...det, photoTries: tries, photoErrors: errors, photoNote: note, photoCheckedAt: now, updatedAt: now });
   const tooOld = Date.now() - Date.parse(det.createdAt) > KEEP_TRYING_DAYS * 86_400_000;
   if (tooOld) {
     await photoQueue.remove([slug]);
@@ -177,9 +181,10 @@ export async function processPhotoQueue({ deadline }: { deadline: number }): Pro
             }
             if (!runFinished(state.status)) await abortZillowRun(token, run.runId);
             const dets = await Promise.all(run.slugs.map((s) => detections.get(s)));
-            const asked = dets.filter((d): d is Detection => !!d).map((d) => d.listing);
+            const live = dets.filter((d): d is Detection => !!d);
+            const queries = new Map(live.map((d) => [d.listing.id, run.queries?.[d.slug] ?? addressQueryFor(d.listing)]));
             const items = await zillowRunItems(token, state.datasetId).catch(() => []);
-            const found = matchItems(asked, items);
+            const found = matchItems(live.map((d) => d.listing), items, queries);
             const failed = state.status !== "SUCCEEDED";
             for (const d of dets) {
               if (!d) continue;
@@ -213,8 +218,10 @@ export async function processPhotoQueue({ deadline }: { deadline: number }): Pro
         await photoQueue.add(slugs, Date.now() + LEASE_MS, true);
         try {
           if (token) {
-            const run = await startZillowRun(token, keep.map((d) => d.listing), RUN_TIMEOUT_SEC);
-            runs.push({ runId: run.id, datasetId: run.datasetId, slugs, startedAt: Date.now() });
+            // Each retry after "not found" writes the address a little differently (see addressQueries).
+            const queries = Object.fromEntries(keep.map((d) => [d.slug, addressQueryFor(d.listing, d.photoTries ?? 0)]));
+            const run = await startZillowRun(token, slugs.map((s) => queries[s]), RUN_TIMEOUT_SEC);
+            runs.push({ runId: run.id, datasetId: run.datasetId, slugs, queries, startedAt: Date.now() });
             await documents.set(RUNS_DOC, runs);
           } else {
             // PHOTO_LOOKUP_URL webhook: answers right away, one home at a time.

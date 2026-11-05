@@ -100,6 +100,9 @@ export interface Detection {
   /** Photo lookups that found nothing yet, and lookups that failed (photo-queue.ts). */
   photoTries?: number;
   photoErrors?: number;
+  /** Why the last photo lookup found none (e.g. "Zillow returned nothing for ..."), for admin. */
+  photoNote?: string;
+  photoCheckedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
