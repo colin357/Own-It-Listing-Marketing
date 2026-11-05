@@ -154,7 +154,7 @@ export interface Match {
 }
 
 /** Confidence at or above this creates the kit automatically. */
-export const AUTO_CONFIDENCE = 0.9;
+export const AUTO_CONFIDENCE = 0.65;
 /** Between this and AUTO_CONFIDENCE goes to the review queue; below is ignored. */
 export const REVIEW_CONFIDENCE = 0.6;
 
