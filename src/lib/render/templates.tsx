@@ -31,7 +31,7 @@ import { activeConcession, concessionSentence, concessionTag } from "../concessi
  */
 
 /** Bump when templates change so cached PNGs/PDFs are re-rendered. */
-export const TEMPLATE_VERSION = "7";
+export const TEMPLATE_VERSION = "8";
 
 /** Cache key for a listing's graphics: changes with the templates, the listing and the rates shown. */
 export function assetVersion(l: Listing): string {
@@ -597,7 +597,7 @@ export function Flyer(d: RenderData) {
           <Person
             photo={pairPhotos(d).agent}
             name={l.agent.name}
-            sub={[l.agent.brokerage, [l.agent.phone, l.agent.email].filter(Boolean).join(" · ")]}
+            sub={[l.agent.brokerage, l.agent.phone]}
             size={104}
             color={INK}
             subColor={MUTED}
@@ -799,7 +799,7 @@ function ListedByFooter({ d, disclaimer }: { d: RenderData; disclaimer: string }
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         {d.agentHeadshot ? <Avatar src={d.agentHeadshot} name={a.name} size={56} ring={LINE} /> : null}
         <div style={{ display: "flex", ...label(15, INK, 900) }}>{`Listed by ${a.name}`}</div>
-        <div style={{ display: "flex", ...body(16, MUTED) }}>{[a.brokerage, a.phone, a.email].filter(Boolean).join(" · ")}</div>
+        <div style={{ display: "flex", ...body(16, MUTED) }}>{[a.brokerage, a.phone].filter(Boolean).join(" · ")}</div>
       </div>
       <div style={{ display: "flex", ...body(11.5, MUTED), lineHeight: 1.35 }}>
         {`*${disclaimer} ${complianceLine(d.lo)}.${d.lo.disclaimer ? ` ${d.lo.disclaimer}` : ""}`}

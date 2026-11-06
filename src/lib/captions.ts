@@ -51,7 +51,7 @@ function hashtags(l: Listing): string {
 }
 
 function callToAction(l: Listing): string {
-  const agentContact = [l.agent.phone, l.agent.email].filter(Boolean).join(" | ");
+  const agentContact = l.agent.phone ?? "";
   switch (l.status) {
     case "just-sold":
       return `Thinking about buying or selling? Let's talk! ${agentContact}`.trim();

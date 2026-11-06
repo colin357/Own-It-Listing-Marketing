@@ -233,11 +233,6 @@ export default async function BuyerPage({ params }: PageProps<"/home/[slug]">) {
                   {agent.phone}
                 </a>
               ) : null}
-              {agent.email ? (
-                <a className="textlink" href={`mailto:${agent.email}`}>
-                  Email
-                </a>
-              ) : null}
             </p>
           </div>
         </aside>
