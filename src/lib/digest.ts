@@ -1,6 +1,8 @@
 import "server-only";
 import { detections, listings, loanOfficers } from "./store";
 import { firstName, formatPrice, statsLine, streetLine } from "./format";
+import { programOptions } from "./mortgage";
+import { buyerPagePath } from "./site";
 import { mailConfigured, sendMail, type Mail } from "./mail";
 import type { Detection } from "./detect/types";
 import type { Listing, LoanOfficer } from "./types";
@@ -28,21 +30,49 @@ function agentMessage(l: Listing, kitUrl: string): string {
 const EMAIL_RE = /^[^\s@,;<>"]+@[^\s@,;<>"]+\.[^\s@,;<>"]+$/;
 
 /**
+ * Plain-text body of the kit email to the listing agent. A mailto: draft can't
+ * carry HTML, so it's laid out with short CAPS headings, numbered steps and
+ * links on their own lines (mail apps turn those into tappable links). It tells
+ * the agent what each part of the kit is for and how to use it.
+ */
+export function agentEmailBody(l: Listing, lo: LoanOfficer | null, origin: string): string {
+  const kitUrl = `${origin}/l/${l.slug}`;
+  const who = firstName(l.agent.name);
+  const forSale = l.status !== "just-sold" && l.status !== "under-contract";
+  // The seller credit section only shows on kits that show payments.
+  const sellerCredit = forSale && !!lo && !!programOptions({ ...l, concession: undefined }, lo);
+  const steps = [
+    `Social posts: Save a post or story and share it on Instagram, Facebook or LinkedIn. Captions are written for you, just tap Copy.`,
+    `Flyers: Print the flyer for showings and open houses. The QR code takes buyers to the home's page.`,
+    `Buyer page: Text or post this link. Buyers see photos, details${lo?.showPayments === false ? "" : " and payments"}, and can call you for a tour in one tap:\n${origin}${buyerPagePath(l.slug)}`,
+    ...(sellerCredit
+      ? [`Seller credit: If your seller will help with buyer costs, pick an option and every graphic and flyer updates to show the lower payment.`]
+      : []),
+    `Emails: Ready-to-send emails for your sphere and buyers are at the bottom of the kit.`,
+  ];
+  return [
+    `Hi${who ? ` ${who}` : ""},`,
+    `Congrats on your new listing at ${streetLine(l)}! I put together a free marketing kit for it, made for this home and ready to post, print or send.`,
+    `YOUR KIT\n${kitUrl}`,
+    ...(l.photos.length
+      ? []
+      : [`We couldn't find your listing photos yet. Add them at the top of the kit and every graphic updates.`]),
+    `HOW TO USE IT\n\n${steps.map((t, i) => `${i + 1}. ${t}`).join("\n\n")}`,
+    `Download everything at once:\n${kitUrl}/download`,
+    `Let me know if you'd like anything changed. And send any buyers with financing questions my way!`,
+  ].join("\n\n");
+}
+
+/**
  * A mailto: link that opens a ready-to-send email to the listing agent in the
  * loan officer's own mail app, so the agent sees it come from the loan officer.
  * When we don't have a usable agent email, the draft opens with an empty To line.
  */
-export function agentMailto(l: Listing, kitUrl: string): { href: string; hasEmail: boolean } {
+export function agentMailto(l: Listing, lo: LoanOfficer | null, origin: string): { href: string; hasEmail: boolean } {
   const email = l.agent.email?.trim() ?? "";
   const hasEmail = EMAIL_RE.test(email);
-  const who = firstName(l.agent.name);
-  const subject = `Marketing kit for ${streetLine(l)}`;
-  const body = [
-    `Hi${who ? ` ${who}` : ""},`,
-    `Congrats on your new listing at ${streetLine(l)}! I put together a free marketing kit for it: social posts, flyers, captions and emails, all ready to download and post.`,
-    kitUrl,
-    "Let me know if you'd like anything changed.",
-  ].join("\n\n");
+  const subject = `Your marketing kit for ${streetLine(l)}`;
+  const body = agentEmailBody(l, lo, origin);
   // encodeURIComponent (not URLSearchParams) so spaces become %20, which every mail app reads.
   const to = hasEmail ? encodeURIComponent(email).replace(/%40/g, "@") : "";
   const href = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body.replace(/\n/g, "\r\n"))}`;
@@ -80,10 +110,10 @@ function buttonRows(primary: string, note: string, secondary: string[]): string 
     </table>`;
 }
 
-function kitCard(l: Listing, origin: string): string {
+function kitCard(l: Listing, lo: LoanOfficer, origin: string): string {
   const kitUrl = `${origin}/l/${l.slug}`;
   const agentFirst = firstName(l.agent.name);
-  const mail = agentMailto(l, kitUrl);
+  const mail = agentMailto(l, lo, origin);
   const mailLabel = `Email kit to ${esc(agentFirst ?? "the agent")}`;
   const mailNote = mail.hasEmail
     ? `Opens an email to ${esc(l.agent.email!.trim())} in your mail app with the kit link. Just hit send.`
@@ -135,7 +165,7 @@ export function renderDigest(lo: LoanOfficer, kits: Listing[], origin: string): 
     <h1 style="margin:10px 0 0;font-size:26px;line-height:1.15;color:#0a0a0a">${n === 1 ? "A new listing kit is ready" : `${n} new listing kits are ready`}</h1>
     <p style="margin:12px 0 0;font-size:15px;line-height:1.55;color:#0a0a0a">Hi ${esc(firstName(lo.name) ?? lo.name)}, ${n === 1 ? "one of your agents just listed a home" : `${n} of your agents' new listings came in`}. Each kit has social posts, flyers, captions and emails, ready to go. Tap <strong>Email kit</strong> under a listing to send it to the agent from your own email, or copy the message to text it.</p>
   </td></tr>
-  <tr><td style="padding:20px 32px 8px">${kits.map((l) => kitCard(l, origin)).join("")}</td></tr>
+  <tr><td style="padding:20px 32px 8px">${kits.map((l) => kitCard(l, lo, origin)).join("")}</td></tr>
   <tr><td style="padding:0 32px 28px">
     <p style="margin:0;font-size:12px;line-height:1.5;color:#5b5b5b">Payment estimates on the kits use the rates and disclosures set up for you. Reply to this email with any changes.</p>
   </td></tr>
