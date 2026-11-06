@@ -42,13 +42,13 @@ export function agentEmailBody(l: Listing, lo: LoanOfficer | null, origin: strin
   // The seller credit section only shows on kits that show payments.
   const sellerCredit = forSale && !!lo && !!programOptions({ ...l, concession: undefined }, lo);
   const steps = [
-    `SOCIAL POSTS: Save a post or story and share it on Instagram, Facebook or LinkedIn. Captions are written for you, just tap Copy.`,
-    `FLYERS: Print the flyer for showings and open houses. The QR code takes buyers to the home's page.`,
-    `BUYER PAGE: Text or post this link. Buyers see photos, details${lo?.showPayments === false ? "" : " and payments"}, and can call you for a tour in one tap:\n${origin}${buyerPagePath(l.slug)}`,
+    `Social posts: Save a post or story and share it on Instagram, Facebook or LinkedIn. Captions are written for you, just tap Copy.`,
+    `Flyers: Print the flyer for showings and open houses. The QR code takes buyers to the home's page.`,
+    `Buyer page: Text or post this link. Buyers see photos, details${lo?.showPayments === false ? "" : " and payments"}, and can call you for a tour in one tap:\n${origin}${buyerPagePath(l.slug)}`,
     ...(sellerCredit
-      ? [`SELLER CREDIT: If your seller will help with buyer costs, pick an option and every graphic and flyer updates to show the lower payment.`]
+      ? [`Seller credit: If your seller will help with buyer costs, pick an option and every graphic and flyer updates to show the lower payment.`]
       : []),
-    `EMAILS: Ready-to-send emails for your sphere and buyers are at the bottom of the kit.`,
+    `Emails: Ready-to-send emails for your sphere and buyers are at the bottom of the kit.`,
   ];
   return [
     `Hi${who ? ` ${who}` : ""},`,
