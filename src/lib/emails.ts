@@ -25,7 +25,7 @@ const lines = (...parts: (string | null | undefined | false)[]) =>
     .trim();
 
 function signature(l: Listing): string {
-  return lines("Best,", l.agent.name, [l.agent.brokerage, l.agent.phone, l.agent.email].filter(Boolean).join(" | "));
+  return lines("Best,", l.agent.name, [l.agent.brokerage, l.agent.phone].filter(Boolean).join(" | "));
 }
 
 function loLine(lo: LoanOfficer): string {
