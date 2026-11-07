@@ -10,6 +10,7 @@ import { applyPhotos, processPhotoQueue, queuePhotos } from "./photo-queue";
 import type { Detection, DetectionRun, SourceListing } from "./types";
 import { refreshMarketRates } from "../rates";
 import { indexListings } from "./mls";
+import { findSameHome, sameHome } from "./dedupe";
 
 /** Loan officer record for a roster/metro name, matched on first + last name. */
 function loFinder(los: LoanOfficer[]) {
@@ -137,7 +138,12 @@ export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin
   const startedAt = new Date(startMs).toISOString();
   const provider = listingProvider();
   if (!provider) throw new Error("No listings feed configured. Set RENTCAST_API_KEY.");
-  const [roster, metros, los] = await Promise.all([getRoster(), getMetros(), loanOfficers.list()]);
+  const [roster, metros, los, known] = await Promise.all([
+    getRoster(),
+    getMetros(),
+    loanOfficers.list(),
+    detections.list(),
+  ]);
   if (!roster.length || !metros.length) throw new Error("Upload the agent roster and metros first (Admin → Roster).");
 
   const match = buildMatcher(roster, metros);
@@ -156,6 +162,8 @@ export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin
   const found: { listing: SourceListing; match: Match; slug: string }[] = [];
   let requests = 0;
   let scanned = 0;
+  let repeats = 0;
+  const knownSlugs = new Set(known.map((d) => d.slug));
 
   // A few metros at a time: one at a time takes minutes once there are many
   // metros, and RentCast is fine with a handful of requests in parallel.
@@ -185,7 +193,13 @@ export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin
       const m = match(l);
       if (!m) continue;
       const slug = slugify(`${l.provider}-${l.id}`);
-      if (await detections.get(slug)) continue;
+      if (knownSlugs.has(slug)) continue;
+      // The feed sometimes lists one home twice under different ids (with and
+      // without a unit, say). Only the first one gets a kit and an email.
+      if (findSameHome(l, known) || found.some((f) => sameHome(f.listing, l))) {
+        repeats++;
+        continue;
+      }
       found.push({ listing: l, match: m, slug });
     }
   }
@@ -290,6 +304,7 @@ export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin
     photosAdded,
     photosQueued: queued,
     emailsSent: 0,
+    repeatsSkipped: repeats,
     review: results.filter((d) => d.status === "review").length,
     waitingLo: results.filter((d) => d.status === "waiting-lo").length,
     errors,

@@ -46,10 +46,10 @@ const DIRECTIONS: Record<string, string> = {
   north: "n", south: "s", east: "e", west: "w",
   northeast: "ne", northwest: "nw", southeast: "se", southwest: "sw",
 };
-const UNIT_WORDS = new Set(["apt", "unit", "ste", "suite", "bldg", "lot", "trlr", "spc", "rm", "fl"]);
+export const UNIT_WORDS = new Set(["apt", "unit", "ste", "suite", "bldg", "lot", "trlr", "spc", "rm", "fl"]);
 
 /** Lowercase words of a street, directions shortened, punctuation dropped. */
-function streetWords(street: string): string[] {
+export function streetWords(street: string): string[] {
   return street
     .toLowerCase()
     .replace(/#/g, " unit ")

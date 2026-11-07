@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function EmailsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const sp = await searchParams;
   const msg = typeof sp.msg === "string" ? sp.msg : "";
-  const { digests, skipped } = await pendingDigests(await siteUrl());
+  const { digests, skipped, repeats } = await pendingDigests(await siteUrl());
   const ready = mailConfigured();
   const total = digests.reduce((n, d) => n + d.kits.length, 0);
 
@@ -49,6 +49,12 @@ export default async function EmailsPage({ searchParams }: { searchParams: Promi
             (Production), then redeploy.
           </p>
         </div>
+      ) : null}
+      {repeats.length ? (
+        <p className="muted small">
+          Left out as repeats (same home the loan officer already got under another address):{" "}
+          {repeats.map((r) => `${r.listing.address}${r.listing.unit ? ` ${r.listing.unit}` : ""}, ${r.listing.city}`).join("; ")}.
+        </p>
       ) : null}
       {skipped.length ? (
         <div className="alert">

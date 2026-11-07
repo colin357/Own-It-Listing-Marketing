@@ -97,6 +97,8 @@ export interface Detection {
   listingSlug?: string;
   /** When the loan officer was emailed this kit. */
   emailedAt?: string;
+  /** Set when this kit was left out of the email because it's the same home as that detection (dedupe.ts). */
+  duplicateOf?: string;
   /** Photo lookups that found nothing yet, and lookups that failed (photo-queue.ts). */
   photoTries?: number;
   photoErrors?: number;
@@ -121,6 +123,8 @@ export interface DetectionRun {
   photosAdded: number;
   /** Homes still waiting for photos when the run ended (they keep loading in the background). */
   photosQueued?: number;
+  /** Listings skipped because they're a home we already have under another feed id (dedupe.ts). */
+  repeatsSkipped?: number;
   /** Loan officers emailed their new kits. */
   emailsSent?: number;
   review: number;
