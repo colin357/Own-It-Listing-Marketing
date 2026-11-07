@@ -5,12 +5,14 @@ import { programOptions } from "./mortgage";
 import { buyerPagePath } from "./site";
 import { mailConfigured, sendMail, type Mail } from "./mail";
 import type { Detection } from "./detect/types";
+import { sameHome } from "./detect/dedupe";
 import type { Listing, LoanOfficer } from "./types";
 
 /**
  * After each detection run, every loan officer gets one email listing the new
  * kits for their agents, with links and a message to forward to each agent.
- * A kit is emailed once (Detection.emailedAt).
+ * A kit is emailed once (Detection.emailedAt), and a home is emailed to a
+ * loan officer once even if it has two kits (see detect/dedupe.ts).
  */
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -175,8 +177,18 @@ export function renderDigest(lo: LoanOfficer, kits: Listing[], origin: string): 
   return { subject, html };
 }
 
-/** Kits not emailed yet, grouped by loan officer. */
-export async function pendingDigests(origin: string): Promise<{ digests: Digest[]; skipped: string[] }> {
+/** A kit left out of the email because the loan officer already has (or is getting) the same home. */
+export interface RepeatKit {
+  det: Detection;
+  listing: Listing;
+  /** Detection slug of the kit that was (or will be) emailed instead. */
+  duplicateOf: string;
+}
+
+/** Kits not emailed yet, grouped by loan officer, with repeats of the same home left out. */
+export async function pendingDigests(
+  origin: string,
+): Promise<{ digests: Digest[]; skipped: string[]; repeats: RepeatKit[] }> {
   const [all, los] = await Promise.all([detections.list(), loanOfficers.list()]);
   const byLo = new Map<string, { det: Detection; listing: Listing }[]>();
   for (const det of all) {
@@ -188,9 +200,27 @@ export async function pendingDigests(origin: string): Promise<{ digests: Digest[
   }
   const digests: Digest[] = [];
   const skipped: string[] = [];
-  for (const [slug, kits] of byLo) {
+  const repeats: RepeatKit[] = [];
+  for (const [slug, pending] of byLo) {
     const lo = los.find((x) => x.slug === slug);
     if (!lo) continue;
+    // Homes this loan officer was already emailed.
+    const sent = all.filter((d) => d.emailedAt && !d.duplicateOf && d.loanOfficerSlug === slug);
+    // Within this batch, keep the kit that has photos (then the older one).
+    pending.sort(
+      (a, b) =>
+        Number(!a.listing.photos.length) - Number(!b.listing.photos.length) ||
+        a.det.createdAt.localeCompare(b.det.createdAt),
+    );
+    const kits: { det: Detection; listing: Listing }[] = [];
+    for (const k of pending) {
+      const same =
+        sent.find((d) => sameHome(d.listing, k.det.listing)) ??
+        kits.find((x) => sameHome(x.det.listing, k.det.listing))?.det;
+      if (same) repeats.push({ ...k, duplicateOf: same.slug });
+      else kits.push(k);
+    }
+    if (!kits.length) continue;
     if (!lo.email) {
       skipped.push(`${lo.name} has no email address, so ${kits.length} kit(s) weren't emailed.`);
       continue;
@@ -199,7 +229,7 @@ export async function pendingDigests(origin: string): Promise<{ digests: Digest[
     digests.push({ lo, kits, ...renderDigest(lo, kits.map((k) => k.listing), origin) });
   }
   digests.sort((a, b) => a.lo.name.localeCompare(b.lo.name));
-  return { digests, skipped };
+  return { digests, skipped, repeats };
 }
 
 /**
@@ -221,8 +251,13 @@ export async function testDigest(origin: string): Promise<{ loName: string; subj
 /** Emails every loan officer their new kits and marks them sent. Returns errors. */
 export async function sendDigests(origin: string): Promise<{ sent: number; errors: string[] }> {
   if (!mailConfigured()) return { sent: 0, errors: [] };
-  const { digests, skipped } = await pendingDigests(origin);
+  const { digests, skipped, repeats } = await pendingDigests(origin);
   const errors = [...skipped];
+  // Repeats never go out; mark them handled so they don't wait in the queue forever.
+  for (const r of repeats) {
+    const now = new Date().toISOString();
+    await detections.save({ ...r.det, emailedAt: now, duplicateOf: r.duplicateOf, updatedAt: now });
+  }
   let sent = 0;
   for (const d of digests) {
     const mail: Mail = { to: [d.lo.email!], subject: d.subject, html: d.html };

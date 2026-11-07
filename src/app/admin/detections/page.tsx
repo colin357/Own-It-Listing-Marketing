@@ -6,6 +6,7 @@ import { PendingButton } from "@/components/admin/PendingButton";
 import { currentMarketRates } from "@/lib/rates";
 import { listingProvider, photoSource } from "@/lib/detect/providers";
 import type { DetectionStatus } from "@/lib/detect/types";
+import { duplicateGroups } from "@/lib/detect/dedupe";
 import { approveAction, dismissAction, fetchPhotosAction, runNowAction } from "./actions";
 
 export const maxDuration = 300;
@@ -32,6 +33,7 @@ export default async function DetectionsPage({ searchParams }: PageProps<"/admin
   const rows = all.filter((d) => (status ? d.status === status : d.status !== "dismissed"));
   const count = (s: DetectionStatus) => all.filter((d) => d.status === s).length;
   const waitingLos = [...new Set(all.filter((d) => d.status === "waiting-lo").map((d) => d.loanOfficerName))];
+  const repeatGroups = duplicateGroups(all.filter((d) => d.status !== "dismissed"));
   const provider = listingProvider();
   const photos = photoSource();
 
@@ -75,6 +77,7 @@ export default async function DetectionsPage({ searchParams }: PageProps<"/admin
             {" "}
             · Last run {new Date(run.finishedAt).toLocaleString("en-US")}: {run.listingsScanned} scanned, {run.matches} matched,{" "}
             {run.created} kits, {run.requests} feed requests
+            {run.repeatsSkipped ? `, ${run.repeatsSkipped} repeat homes skipped` : ""}
             {run.errors.length ? `, ${run.errors.length} errors` : ""}
           </>
         ) : null}
@@ -165,6 +168,44 @@ export default async function DetectionsPage({ searchParams }: PageProps<"/admin
                         {det.photoTries ? ` (tried ${det.photoTries}×)` : ""}
                       </>
                     ) : null}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </details>
+        </div>
+      ) : null}
+      {repeatGroups.length ? (
+        <div className="alert">
+          <strong>
+            {repeatGroups.length} home{repeatGroups.length === 1 ? "" : "s"} found twice
+          </strong>{" "}
+          (the listings feed sent the same home under two addresses or ids, e.g. with and without a unit). New runs skip these, and
+          a loan officer is never emailed the same home twice. Dismiss the extra kit if you like.
+          <details>
+            <summary className="small">Show which</summary>
+            <ul>
+              {repeatGroups.map((g) => (
+                <li key={g[0].slug}>
+                  {g.map((d, i) => (
+                    <span key={d.slug}>
+                      {i ? " = " : ""}
+                      {d.listingSlug ? (
+                        <a href={`/l/${d.listingSlug}`} target="_blank" rel="noreferrer">
+                          {d.listing.address}
+                          {d.listing.unit ? ` ${d.listing.unit}` : ""}
+                        </a>
+                      ) : (
+                        <>
+                          {d.listing.address}
+                          {d.listing.unit ? ` ${d.listing.unit}` : ""}
+                        </>
+                      )}
+                    </span>
+                  ))}{" "}
+                  <span className="muted small">
+                    ({g[0].listing.city}, LO {g[0].loanOfficerName}
+                    {g.filter((d) => d.emailedAt && !d.duplicateOf).length > 1 ? ", emailed twice before this fix" : ""})
                   </span>
                 </li>
               ))}
