@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { countToday, loanOfficers, uncountToday } from "@/lib/store";
+import { isActive } from "@/lib/plan";
 import { validLoToken } from "@/lib/loLinks";
 import { isNewConstruction } from "@/lib/detect/newConstruction";
 import { findByAddress, findByKey, findInZip, indexKey } from "@/lib/detect/mls";
@@ -40,7 +41,9 @@ export interface FindState {
 
 async function authorizedLo(slug: string, token: string) {
   if (!validLoToken(slug, token)) return null;
-  return loanOfficers.get(slug);
+  const lo = await loanOfficers.get(slug);
+  // A self-signup loan officer whose subscription lapsed can't build new kits.
+  return lo && isActive(lo) ? lo : null;
 }
 
 const text = (fd: FormData, name: string) => String(fd.get(name) ?? "").trim();

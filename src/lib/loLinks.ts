@@ -28,3 +28,26 @@ export function buildPath(slug: string): string | null {
   const token = loToken(slug);
   return token ? `/build/${slug}/${token}` : null;
 }
+
+/**
+ * A loan officer's private account page, /account/<slug>/<token>, where they
+ * edit their profile, service area and agents and manage billing. Same
+ * secret as the build link, different purpose string.
+ */
+export function accountToken(slug: string): string | null {
+  const s = secret();
+  return s ? createHmac("sha256", s).update(`account:${slug}`).digest("base64url").slice(0, 20) : null;
+}
+
+export function validAccountToken(slug: string, token: string): boolean {
+  const expected = accountToken(slug);
+  if (!expected) return false;
+  const a = Buffer.from(expected);
+  const b = Buffer.from(token);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+export function accountPath(slug: string): string | null {
+  const token = accountToken(slug);
+  return token ? `/account/${slug}/${token}` : null;
+}

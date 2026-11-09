@@ -1,4 +1,5 @@
 import "server-only";
+import { isActive } from "./plan";
 import { detections, listings, loanOfficers } from "./store";
 import { firstName, formatPrice, statsLine, streetLine } from "./format";
 import { programOptions } from "./mortgage";
@@ -217,7 +218,8 @@ export async function pendingDigests(
   const noPhotos: WaitingKit[] = [];
   for (const [slug, pending] of byLo) {
     const lo = los.find((x) => x.slug === slug);
-    if (!lo) continue;
+    // A self-signup loan officer whose subscription lapsed isn't emailed.
+    if (!lo || !isActive(lo)) continue;
     // Homes this loan officer was already emailed.
     const sent = all.filter((d) => d.emailedAt && !d.duplicateOf && d.loanOfficerSlug === slug);
     // Within this batch, keep the kit that has photos (then the older one).

@@ -3,7 +3,7 @@ import { detections, listings } from "../store";
 import { slugify } from "../format";
 import type { Listing, LoanOfficer } from "../types";
 import { buildMatcher, nameParts } from "./match";
-import { getMetros, getRoster } from "./roster";
+import { detectionInputs } from "./roster";
 import { lookupPhotos, photoSource } from "./providers";
 import { createKitFromDetection } from "./run";
 import { normalizeMls } from "./mls";
@@ -63,7 +63,7 @@ export async function buildKitForLo(lo: LoanOfficer, source: SourceListing): Pro
   }
 
   // The roster may know the agent's headshot, phone or email.
-  const [roster, metros] = await Promise.all([getRoster(), getMetros()]);
+  const { roster, metros } = await detectionInputs();
   const match = roster.length ? buildMatcher(roster, metros)(listing) : null;
   const ownAgent = match && samePerson(match.agent.loanOfficer, lo.name) ? match.agent : null;
   const rosterAgent: RosterAgent = ownAgent ?? {

@@ -252,6 +252,8 @@ export function parseLoanOfficerInput(raw: Raw, existing?: LoanOfficer): LoanOff
     disclaimer: str(raw.disclaimer),
     showPayments: bool(raw.showPayments, existing?.showPayments ?? true),
     payment,
+    // Set by Stripe and the loan officer's account page, never by these forms.
+    billing: existing?.billing,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };
