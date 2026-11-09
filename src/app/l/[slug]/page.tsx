@@ -240,7 +240,8 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
                 </a>
               </div>
             </div>
-            {blobMode() ? (
+            {/* Builder listings (new construction) have no agent, so no agent headshot. */}
+            {blobMode() && !l.builder ? (
               <AgentHeadshotUpload slug={l.slug} mode={blobMode()!} current={l.agent.headshotUrl} name={l.agent.name} />
             ) : null}
           </div>
