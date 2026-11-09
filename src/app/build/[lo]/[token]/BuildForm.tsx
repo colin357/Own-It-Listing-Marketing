@@ -39,10 +39,12 @@ export function BuildForm({ slug, token, photos }: { slug: string; token: string
             {f.baths != null ? <span>{f.baths} ba</span> : null}
             {f.sqft ? <span>{f.sqft.toLocaleString("en-US")} sq ft</span> : null}
           </p>
-          <p className="small">
-            Listed by <strong>{f.agent}</strong>
-            {f.office ? `, ${f.office}` : ""}
-          </p>
+          {f.agent ? (
+            <p className="small">
+              Listed by <strong>{f.agent}</strong>
+              {f.office ? `, ${f.office}` : ""}
+            </p>
+          ) : null}
 
           {f.existingSlug ? (
             <div className="build-actions">
@@ -54,6 +56,26 @@ export function BuildForm({ slug, token, photos }: { slug: string; token: string
           ) : (
             <form action={build} className="build-actions">
               <input type="hidden" name="key" value={f.key} />
+              {!f.agent ? (
+                <fieldset className="build-agent">
+                  <legend className="small">
+                    Our listing feed doesn&apos;t name the agent for this home (common with new construction). Add them
+                    so they show on the graphics.
+                  </legend>
+                  <label className="field">
+                    <span className="field-label">Listing agent</span>
+                    <input name="agentName" required placeholder="Full name" autoComplete="off" />
+                  </label>
+                  <label className="field">
+                    <span className="field-label">Brokerage</span>
+                    <input name="agentBrokerage" defaultValue={f.office} placeholder="Optional" autoComplete="off" />
+                  </label>
+                  <label className="field">
+                    <span className="field-label">Agent phone</span>
+                    <input name="agentPhone" type="tel" placeholder="Optional" autoComplete="off" />
+                  </label>
+                </fieldset>
+              ) : null}
               <button className="pill" disabled={building}>
                 {building ? "Building your kit…" : "Build the kit"}
               </button>

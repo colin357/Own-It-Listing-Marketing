@@ -7,6 +7,10 @@ interface Suggestion {
   placeId?: string;
 }
 
+/** Short pause so a burst of keystrokes sends one request, not one per letter. */
+const DEBOUNCE_MS = 120;
+const MIN_CHARS = 3;
+
 const newSession = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random()).slice(2);
 
@@ -24,30 +28,54 @@ export function AddressInput({ slug, token, defaultValue }: { slug: string; toke
   const listId = useId();
   const base = `/build/${encodeURIComponent(slug)}/${encodeURIComponent(token)}/suggest`;
 
+  // Results show while the LO is still typing: requests are not cancelled by the
+  // next keystroke (that left nothing on screen until typing stopped). Answers
+  // older than the list on screen are dropped, and the last list stays up meanwhile.
+  const seq = useRef(0);
+  /** The newest request whose results are on screen. */
+  const shown = useRef(0);
+  const cache = useRef(new Map<string, Suggestion[]>());
+  const [loading, setLoading] = useState(false);
+
   useEffect(() => {
     const q = value.trim();
-    if (q.length < 4 || q === picked.current) {
+    if (q.length < MIN_CHARS || q === picked.current) {
+      shown.current = ++seq.current;
       setItems([]);
+      setLoading(false);
       return;
     }
-    const ctrl = new AbortController();
+    const key = q.toLowerCase();
+    const hit = cache.current.get(key);
+    if (hit) {
+      shown.current = ++seq.current;
+      setItems(hit);
+      setLoading(false);
+      setOpen(true);
+      return;
+    }
+    setLoading(true);
+    setOpen(true);
     const t = setTimeout(async () => {
+      const mine = ++seq.current;
       try {
-        const res = await fetch(`${base}?${new URLSearchParams({ q, session: session.current })}`, {
-          signal: ctrl.signal,
-        });
+        const res = await fetch(`${base}?${new URLSearchParams({ q, session: session.current })}`);
         const data = (await res.json()) as { suggestions?: Suggestion[] };
-        setItems(data.suggestions ?? []);
+        const list = data.suggestions ?? [];
+        cache.current.set(key, list);
+        // An answer for an earlier prefix still beats an empty list while the LO
+        // keeps typing; only answers older than what's on screen are dropped.
+        if (mine < shown.current) return;
+        shown.current = mine;
+        setItems(list);
         setActive(-1);
-        setOpen(true);
       } catch {
-        /* typing on, or offline: keep the box usable without suggestions */
+        /* offline or slow: the box still works without suggestions */
+      } finally {
+        if (mine === seq.current) setLoading(false);
       }
-    }, 250);
-    return () => {
-      clearTimeout(t);
-      ctrl.abort();
-    };
+    }, DEBOUNCE_MS);
+    return () => clearTimeout(t);
   }, [value, base]);
 
   async function pick(s: Suggestion) {
@@ -86,7 +114,8 @@ export function AddressInput({ slug, token, defaultValue }: { slug: string; toke
     }
   }
 
-  const showList = open && items.length > 0;
+  const typed = value.trim().length >= MIN_CHARS && value.trim() !== picked.current;
+  const showList = open && typed && (items.length > 0 || loading || value.trim().length >= 6);
 
   return (
     <div className="addr">
@@ -111,6 +140,11 @@ export function AddressInput({ slug, token, defaultValue }: { slug: string; toke
       />
       {showList ? (
         <ul className="addr-list" id={listId} role="listbox">
+          {items.length === 0 ? (
+            <li className="addr-status" role="presentation" aria-live="polite">
+              {loading ? "Searching addresses…" : "No matches yet. Keep typing, or enter the full address."}
+            </li>
+          ) : null}
           {items.map((s, i) => (
             <li
               key={`${s.label}-${i}`}
@@ -127,6 +161,7 @@ export function AddressInput({ slug, token, defaultValue }: { slug: string; toke
               {s.label}
             </li>
           ))}
+          {items.length > 0 && loading ? <li className="addr-status addr-status-sm" role="presentation">Updating…</li> : null}
         </ul>
       ) : null}
     </div>

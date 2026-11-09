@@ -21,6 +21,7 @@ export interface FoundListing {
   baths?: number;
   sqft?: number;
   mlsNumber?: string;
+  /** Empty when the feed has no agent (e.g. a builder's listing); the LO types it in. */
   agent: string;
   office?: string;
   listedDate?: string;
@@ -139,8 +140,18 @@ export interface BuildState {
 export async function buildKitAction(slug: string, token: string, _prev: BuildState, fd: FormData): Promise<BuildState> {
   const lo = await authorizedLo(slug, token);
   if (!lo) return { error: "This link isn't valid anymore. Ask Own It Social for a new one." };
-  const listing = await findByKey(text(fd, "key"));
+  let listing = await findByKey(text(fd, "key"));
   if (!listing) return { error: "That listing expired from our search. Look it up again." };
+  if (!listing.agent.name) {
+    const name = text(fd, "agentName");
+    if (!name) return { error: "Add the listing agent's name so it shows on the graphics." };
+    const brokerage = text(fd, "agentBrokerage");
+    listing = {
+      ...listing,
+      agent: { ...listing.agent, name, phone: text(fd, "agentPhone") || listing.agent.phone },
+      office: brokerage ? { ...listing.office, name: brokerage } : listing.office,
+    };
+  }
   let kitSlug: string;
   try {
     kitSlug = (await buildKitForLo(lo, listing)).slug;
