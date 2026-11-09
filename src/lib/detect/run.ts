@@ -372,6 +372,8 @@ export async function approveDetection(slug: string, origin: string, loSlug?: st
     updatedAt: new Date().toISOString(),
   };
   await detections.save(saved);
+  // Zillow didn't have photos this time: keep looking in the background.
+  if (!listing.photos.length && photoSource()) await queuePhotos([saved.slug]);
   await notify(origin, kit, lo, saved);
   return saved;
 }

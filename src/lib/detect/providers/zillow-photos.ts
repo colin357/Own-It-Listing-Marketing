@@ -42,6 +42,22 @@ export function addressQueryFor(l: SourceListing, tries = 0): string {
   return qs[tries % qs.length];
 }
 
+/**
+ * The address with no city: "2211 Garfield St, SC 29405". RentCast uses the
+ * USPS city, which often isn't the one Zillow shows (USPS "North Charleston"
+ * vs Zillow "Charleston"), and Zillow then can't find the home. Street + ZIP
+ * is enough to pin it down, so every lookup sends this form as well.
+ */
+export function zipQuery(l: SourceListing): string {
+  const street = l.unit ? `${l.address} ${l.unit}` : l.address;
+  return `${street}, ${l.state} ${l.zip}`.replace(/\s+/g, " ").trim();
+}
+
+/** Address texts to send to Zillow for one home on the given try: that try's form plus the no-city form. */
+export function zillowInputsFor(l: SourceListing, tries = 0): string[] {
+  return [...new Set([addressQueryFor(l, tries), ...(l.zip ? [zipQuery(l)] : [])])];
+}
+
 const DIRECTIONS: Record<string, string> = {
   north: "n", south: "s", east: "e", west: "w",
   northeast: "ne", northwest: "nw", southeast: "se", southwest: "sw",
@@ -126,8 +142,8 @@ function describe(item: Item): string {
 /**
  * Matches actor output back to the listings that were asked for, keyed by
  * listing id. Every listing asked for gets an entry; one without photos says
- * why in `note`. `queries` is the address text sent for each listing id
- * (defaults to addressQuery).
+ * why in `note`. `queries` is the address text (or texts) sent for each
+ * listing id (defaults to addressQuery).
  *
  * Matching, most certain first: the actor's echo of our query
  * (addressOrUrlFromInput), then house number + street name + zip (and unit,
@@ -136,21 +152,28 @@ function describe(item: Item): string {
 export function matchItems(
   listings: SourceListing[],
   items: unknown,
-  queries?: Map<string, string>,
+  queries?: Map<string, string | string[]>,
 ): Map<string, PhotoResult> {
   const out = new Map<string, PhotoResult>();
   const list = (Array.isArray(items) ? (items as Item[]) : []).filter((x) => x && typeof x === "object");
   const used = new Set<Item>();
   const number = (street: string) => streetWords(street)[0] ?? "";
 
+  const asked = (l: SourceListing): string[] => {
+    const q = queries?.get(l.id) ?? addressQuery(l);
+    return Array.isArray(q) ? q : [q];
+  };
+  const echoes = (x: Item, qs: string[]) =>
+    typeof x.addressOrUrlFromInput === "string" && qs.some((q) => sameText(x.addressOrUrlFromInput as string, q));
+
   const pick = (l: SourceListing): Item | undefined => {
-    const query = queries?.get(l.id) ?? addressQuery(l);
-    const free = list.filter((x) => !used.has(x));
+    const qs = asked(l);
+    // Several answers can be the same home (one per address form sent); prefer one with photos.
+    const free = list.filter((x) => !used.has(x)).sort((a, b) => Number(!photosFromItem(a).length) - Number(!photosFromItem(b).length));
     // 1. The actor says which input it was answering. Trust it if the house number agrees.
     const echoed = free.find(
       (x) =>
-        typeof x.addressOrUrlFromInput === "string" &&
-        sameText(x.addressOrUrlFromInput, query) &&
+        echoes(x, qs) &&
         (!itemAddress(x).street || number(itemAddress(x).street) === number(l.address)),
     );
     if (echoed) return echoed;
@@ -172,7 +195,7 @@ export function matchItems(
     const rivals = listings.filter((o) => number(o.address) === number(l.address) && o.zip.slice(0, 5) === l.zip.slice(0, 5));
     if (loose.length === 1 && rivals.length === 1) return loose[0];
     // 4. One home asked, one answer.
-    if (listings.length === 1 && free.length === 1 && number(itemAddress(free[0]).street) === number(l.address))
+    if (listings.length === 1 && free.length && free.every((x) => number(itemAddress(x).street) === number(l.address)))
       return free[0];
     return undefined;
   };
@@ -180,8 +203,8 @@ export function matchItems(
   for (const l of listings) {
     const item = pick(l);
     if (!item) {
-      const query = queries?.get(l.id) ?? addressQuery(l);
-      const near = list.find((x) => typeof x.addressOrUrlFromInput === "string" && sameText(x.addressOrUrlFromInput, query));
+      const query = asked(l).join('" or "');
+      const near = list.find((x) => echoes(x, asked(l)));
       out.set(l.id, {
         photos: [],
         note: near
@@ -191,6 +214,12 @@ export function matchItems(
       continue;
     }
     used.add(item);
+    // Other answers for the same home (from the other address form) aren't another listing's,
+    // unless another home in the batch shares the street address (units of one building).
+    const key = addressKey(itemAddress(item).street, itemAddress(item).zip);
+    const shared = listings.some((o) => o !== l && addressKey(o.address, o.zip) === key);
+    for (const x of list)
+      if (echoes(x, asked(l)) || (!shared && addressKey(itemAddress(x).street, itemAddress(x).zip) === key)) used.add(x);
     const photos = photosFromItem(item);
     const description = typeof item.description === "string" ? item.description : undefined;
     const link = [item.propertyUrl, item.hdpUrl, item.url].find((u) => typeof u === "string") as string | undefined;
@@ -276,17 +305,18 @@ export async function zillowPhotos(
   timeoutSec = 180,
 ): Promise<Map<string, PhotoResult>> {
   if (!listings.length) return new Map();
+  const inputs = listings.map((l) => zillowInputsFor(l));
   const res = await fetch(
-    `${API}/acts/${actorId()}/run-sync-get-dataset-items?timeout=${timeoutSec}&maxItems=${listings.length * 3}`,
+    `${API}/acts/${actorId()}/run-sync-get-dataset-items?timeout=${timeoutSec}&maxItems=${inputs.flat().length * 3}`,
     {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: actorInput(listings.map((l) => addressQuery(l))),
+      body: actorInput(inputs.flat()),
       cache: "no-store",
       // Apify holds sync runs open for up to 300s; the caller sizes timeoutSec to fit the function budget.
       signal: AbortSignal.timeout((timeoutSec + 20) * 1000),
     },
   );
   if (!res.ok) throw new Error(`Apify ${res.status}: ${(await res.text()).slice(0, 200)}`);
-  return matchItems(listings, await res.json());
+  return matchItems(listings, await res.json(), new Map(listings.map((l, i) => [l.id, inputs[i]])));
 }

@@ -7,6 +7,7 @@ import { getMetros, getRoster } from "./roster";
 import { lookupPhotos, photoSource } from "./providers";
 import { createKitFromDetection } from "./run";
 import { normalizeMls } from "./mls";
+import { queuePhotos } from "./photo-queue";
 import type { Detection, RosterAgent, SourceListing } from "./types";
 
 /**
@@ -41,9 +42,11 @@ export async function buildKitForLo(lo: LoanOfficer, source: SourceListing): Pro
   if (existing) return existing;
 
   let listing = source;
+  let photoNote: string | undefined;
   if (!listing.photos.length && photoSource()) {
     try {
       const p = (await lookupPhotos([listing])).get(listing.id);
+      photoNote = p?.photos.length ? undefined : (p?.note ?? "Zillow returned nothing for this address");
       if (p)
         listing = {
           ...listing,
@@ -52,8 +55,10 @@ export async function buildKitForLo(lo: LoanOfficer, source: SourceListing): Pro
           ...(p.listingUrl ? { listingUrl: p.listingUrl } : {}),
         };
     } catch (err) {
-      // The kit still works without photos; the agent can add them on the kit page.
+      // The kit still works without photos; the agent can add them on the kit page,
+      // and the photo queue keeps looking (below).
       console.error("Photo lookup failed", err);
+      photoNote = "The Zillow lookup didn't finish; retrying";
     }
   }
 
@@ -89,8 +94,18 @@ export async function buildKitForLo(lo: LoanOfficer, source: SourceListing): Pro
   const prior = await detections.get(det.slug);
   const otherLo = match && !ownAgent && !prior;
   const priorOpen = prior && prior.status !== "created" && prior.status !== "dismissed" && samePerson(prior.loanOfficerName, lo.name);
-  if ((!prior && !otherLo) || priorOpen)
-    await detections.save({ ...(prior ?? det), ...det, createdAt: prior?.createdAt ?? now, listingSlug: kit.slug });
+  if ((!prior && !otherLo) || priorOpen) {
+    await detections.save({
+      ...(prior ?? det),
+      ...det,
+      createdAt: prior?.createdAt ?? now,
+      listingSlug: kit.slug,
+      // The first lookup counts as a try, so the next one writes the address differently.
+      ...(photoNote ? { photoNote, photoTries: 1, photoCheckedAt: now } : {}),
+    });
+    // No photos yet: keep looking in the background, the same way detected kits do.
+    if (!listing.photos.length && photoSource()) await queuePhotos([det.slug]);
+  }
 
   return kit;
 }
