@@ -64,7 +64,6 @@ export default function Home() {
         <section className="lp-hero">
           <div className="wrap lp-hero-inner">
             <div className="lp-hero-copy">
-              <p className="eyebrow">For mortgage loan officers</p>
               <h1 className="display lp-title">
                 <span>Listing marketing</span>
                 <span>for your agents.</span>
