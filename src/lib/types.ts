@@ -140,6 +140,8 @@ export interface Listing {
   showPayment: boolean;
   /** Set on listings created by new-listing detection. */
   source?: ListingSource;
+  /** Builder credited in place of a listing agent (new construction). No agent headshot then. */
+  builder?: string;
   createdAt: string;
   updatedAt: string;
 }

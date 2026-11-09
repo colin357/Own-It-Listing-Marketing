@@ -67,13 +67,14 @@ export async function createKitFromDetection(det: Detection, lo: LoanOfficer): P
       email: s.agent.email ?? det.rosterAgent.email,
       brokerage: s.office?.name ?? det.rosterAgent.brokerage,
       // A headshot the agent uploaded on an earlier kit beats the roster's.
-      headshotUrl: (await savedHeadshot(s.agent.name)) ?? det.rosterAgent.headshotUrl,
+      headshotUrl: s.builder ? undefined : ((await savedHeadshot(s.agent.name)) ?? det.rosterAgent.headshotUrl),
     },
     listingUrl: s.listingUrl,
   });
   const listing: Listing = {
     ...created,
     source: { provider: s.provider, id: s.id, mlsNumber: s.mlsNumber, mlsName: s.mlsName, detectedAt: det.createdAt },
+    ...(s.builder ? { builder: s.builder } : {}),
   };
   await listings.save(listing);
   return listing;

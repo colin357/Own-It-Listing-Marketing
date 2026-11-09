@@ -161,6 +161,7 @@ export async function buildKitAction(slug: string, token: string, _prev: BuildSt
         agent: { ...listing.agent, name: contact || builder, phone: text(fd, "agentPhone") || listing.agent.phone },
         office: contact ? { ...listing.office, name: builder } : listing.office,
         listingType: "New Construction",
+        builder,
         ...(community ? { community } : {}),
       };
     } else {
