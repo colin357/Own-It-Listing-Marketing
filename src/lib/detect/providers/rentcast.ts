@@ -48,8 +48,13 @@ interface RentcastListing {
 /** Land and rentals-style records aren't useful for listing kits. */
 const SKIP_TYPES = new Set(["Land", "Apartment"]);
 
-export function fromRentcast(r: RentcastListing): SourceListing | null {
-  if (!r.listingAgent?.name || !r.addressLine1 || !r.price) return null;
+/**
+ * `needAgent: false` keeps listings RentCast has no agent for (often
+ * new-construction homes listed by a builder). Detection needs the agent to
+ * match the roster, but an LO building a kit by hand can type the agent in.
+ */
+export function fromRentcast(r: RentcastListing, { needAgent = true } = {}): SourceListing | null {
+  if ((needAgent && !r.listingAgent?.name) || !r.addressLine1 || !r.price) return null;
   if (r.propertyType && SKIP_TYPES.has(r.propertyType)) return null;
   return {
     provider: "rentcast",
@@ -74,7 +79,7 @@ export function fromRentcast(r: RentcastListing): SourceListing | null {
     mlsName: r.mlsName,
     listedDate: r.listedDate,
     photos: [],
-    agent: { name: r.listingAgent.name, ...pickContact(r.listingAgent) },
+    agent: { name: r.listingAgent?.name ?? "", ...pickContact(r.listingAgent ?? {}) },
     office: r.listingOffice?.name ? { name: r.listingOffice.name, ...pickContact(r.listingOffice) } : undefined,
   };
 }
@@ -158,7 +163,7 @@ export async function rentcastActiveInZip(apiKey: string, zip: string): Promise<
   if (res.status === 404) return [];
   if (!res.ok) throw new Error(`RentCast ${res.status} for ZIP ${zip}: ${(await res.text()).slice(0, 200)}`);
   const rows = (await res.json()) as RentcastListing[];
-  const kept = rows.map(fromRentcast).filter((l): l is SourceListing => !!l);
+  const kept = rows.map((r) => fromRentcast(r, { needAgent: false })).filter((l): l is SourceListing => !!l);
   console.info(`RentCast ZIP ${zip}: ${rows.length} active listings, ${kept.length} usable`);
   return kept;
 }
@@ -184,6 +189,6 @@ export async function rentcastByAddress(apiKey: string, address: string): Promis
   );
   return rows
     .sort((a, b) => Number(b.status === "Active") - Number(a.status === "Active"))
-    .map(fromRentcast)
+    .map((r) => fromRentcast(r, { needAgent: false }))
     .filter((l): l is SourceListing => !!l);
 }

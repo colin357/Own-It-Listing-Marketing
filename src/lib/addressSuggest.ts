@@ -21,7 +21,7 @@ export interface Bias {
   longitude: number;
 }
 
-const TIMEOUT = 4000;
+const TIMEOUT = 3000;
 
 const STATES: Record<string, string> = {
   alabama: "AL", alaska: "AK", arizona: "AZ", arkansas: "AR", california: "CA", colorado: "CO", connecticut: "CT",
@@ -49,7 +49,7 @@ export function suggestProvider(): "google" | "photon" {
 
 export async function suggestAddresses(query: string, bias?: Bias, session?: string): Promise<AddressSuggestion[]> {
   const q = query.trim();
-  if (q.length < 4) return [];
+  if (q.length < 3) return [];
   const key = process.env.GOOGLE_MAPS_API_KEY;
   return key ? googleSuggest(key, q, bias, session) : photonSuggest(q, bias);
 }

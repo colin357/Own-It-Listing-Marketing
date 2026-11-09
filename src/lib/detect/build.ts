@@ -77,7 +77,7 @@ export async function buildKitForLo(lo: LoanOfficer, source: SourceListing): Pro
     slug: slugify(`${listing.provider}-${listing.id}`),
     status: "created",
     confidence: 1,
-    reason: `Built by ${lo.name} from MLS #${listing.mlsNumber ?? "unknown"}`,
+    reason: `Built by ${lo.name} from ${listing.mlsNumber ? `MLS #${listing.mlsNumber}` : listing.address}`,
     rosterAgent,
     loanOfficerName: lo.name,
     loanOfficerSlug: lo.slug,
