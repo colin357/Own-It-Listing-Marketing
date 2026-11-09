@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { countToday, loanOfficers, uncountToday } from "@/lib/store";
 import { validLoToken } from "@/lib/loLinks";
-import { findByAddress, findByKey, findInZip, indexKey, normalizeMls } from "@/lib/detect/mls";
+import { findByAddress, findByKey, findInZip, indexKey } from "@/lib/detect/mls";
 import { homeAddress } from "@/lib/detect/dedupe";
 import { buildKitForLo, existingKit } from "@/lib/detect/build";
 import type { SourceListing } from "@/lib/detect/types";
@@ -28,10 +28,7 @@ export interface FoundListing {
 }
 
 export interface FindState {
-  mls?: string;
   address?: string;
-  /** Show the address field: the MLS # wasn't found. */
-  askAddress?: boolean;
   error?: string;
   found?: FoundListing;
 }
@@ -44,7 +41,7 @@ async function authorizedLo(slug: string, token: string) {
 const text = (fd: FormData, name: string) => String(fd.get(name) ?? "").trim();
 
 const LIMIT_MESSAGE =
-  "You've reached today's limit for address searches. MLS numbers we already have still work, and address search resets tomorrow. Need this one sooner? Contact Own It Social.";
+  "You've reached today's limit for address searches. It resets tomorrow. Need this one sooner? Contact Own It Social.";
 
 const ADDRESS_HELP = "Add the city, state and ZIP, like 123 Main St, Austin, TX 78704.";
 
@@ -59,15 +56,11 @@ function zipOf(address: string): string | null {
 }
 
 /**
- * The listing in `pool` the LO meant: same MLS # first, then the same street
- * address ("Dr" and "Drive" match), then same house number and street name
- * when only the suffix or a direction differs.
+ * The listing in `pool` the LO meant: the same street address ("Dr" and
+ * "Drive" match), then same house number and street name when only the
+ * suffix or a direction differs.
  */
-function pickListing(pool: SourceListing[], mls: string, address: string, zip: string): SourceListing | null {
-  if (mls) {
-    const byMls = pool.find((l) => l.mlsNumber && normalizeMls(l.mlsNumber) === mls);
-    if (byMls) return byMls;
-  }
+function pickListing(pool: SourceListing[], address: string, zip: string): SourceListing | null {
   const typed = homeAddress({ address: address.split(",")[0], zip }).street;
   const exact = pool.find((l) => homeAddress(l).street === typed);
   if (exact) return exact;
@@ -101,53 +94,41 @@ function summary(l: SourceListing, existingSlug?: string): FoundListing {
 export async function findListingAction(slug: string, token: string, _prev: FindState, fd: FormData): Promise<FindState> {
   const lo = await authorizedLo(slug, token);
   if (!lo) return { error: "This link isn't valid anymore. Ask Own It Social for a new one." };
-  const mlsInput = text(fd, "mls");
-  const mls = normalizeMls(mlsInput);
-  // The address box keeps its last value. If only the MLS # changed since the last
-  // search, that address belongs to another listing, so don't search (or count) it again.
-  const typed = text(fd, "address");
-  const stale = !!typed && typed === text(fd, "prevAddress") && mls !== normalizeMls(text(fd, "prevMls"));
-  const address = stale ? "" : typed;
-  if (!mls && !address) return { error: "Enter the listing's MLS number." };
+  const address = text(fd, "address");
+  if (!address) return { error: "Enter the property address." };
+  if (!completeAddress(address)) return { address, error: ADDRESS_HELP };
 
   try {
-    let listing = mls ? await findByKey(mls) : null;
-    if (!listing && address) {
-      if (!completeAddress(address)) return { mls: mlsInput, address, askAddress: true, error: ADDRESS_HELP };
-      const counter = `address-lookup:${lo.slug}`;
-      const limitReached: FindState = { mls: mlsInput, address, askAddress: true, error: LIMIT_MESSAGE };
-      if ((await countToday(counter)) > ADDRESS_LOOKUPS_PER_DAY) return limitReached;
-      let results: SourceListing[];
-      try {
-        results = await findByAddress(address);
-      } catch (err) {
-        if (!(err instanceof UnreadableAddressError)) throw err;
-        await uncountToday(counter);
-        return { mls: mlsInput, address, askAddress: true, error: `We couldn't read that address. ${ADDRESS_HELP}` };
-      }
-      listing = results.find((l) => mls && l.mlsNumber && normalizeMls(l.mlsNumber) === mls) ?? results[0] ?? null;
-      // RentCast's address search misses some active listings (new streets, new
-      // construction, its own spelling of the address). Look through every active
-      // listing in the ZIP instead, matching by MLS # or street address.
-      const zip = listing ? null : zipOf(address);
-      if (zip) {
-        if ((await countToday(counter)) > ADDRESS_LOOKUPS_PER_DAY) return limitReached;
-        listing = pickListing(await findInZip(zip), mls, address, zip);
-      }
-      if (!listing)
-        return {
-          mls: mlsInput,
-          address,
-          askAddress: true,
-          error: "We couldn't find a listing at that address. Check the spelling and include the city, state and ZIP.",
-        };
+    const counter = `address-lookup:${lo.slug}`;
+    const limitReached: FindState = { address, error: LIMIT_MESSAGE };
+    if ((await countToday(counter)) > ADDRESS_LOOKUPS_PER_DAY) return limitReached;
+    let results: SourceListing[];
+    try {
+      results = await findByAddress(address);
+    } catch (err) {
+      if (!(err instanceof UnreadableAddressError)) throw err;
+      await uncountToday(counter);
+      return { address, error: `We couldn't read that address. ${ADDRESS_HELP}` };
     }
-    if (!listing) return { mls: mlsInput, askAddress: true };
+    let listing: SourceListing | null = results[0] ?? null;
+    // RentCast's address search misses some active listings (new streets, new
+    // construction, its own spelling of the address). Look through every active
+    // listing in the ZIP instead, matching by street address.
+    const zip = listing ? null : zipOf(address);
+    if (zip) {
+      if ((await countToday(counter)) > ADDRESS_LOOKUPS_PER_DAY) return limitReached;
+      listing = pickListing(await findInZip(zip), address, zip);
+    }
+    if (!listing)
+      return {
+        address,
+        error: "We couldn't find an active listing at that address. Check the spelling and include the city, state and ZIP.",
+      };
     const kit = await existingKit(lo, listing);
-    return { mls: mlsInput, address, found: summary(listing, kit?.slug) };
+    return { address, found: summary(listing, kit?.slug) };
   } catch (err) {
-    console.error("MLS lookup failed", err);
-    return { mls: mlsInput, address, askAddress: !!address, error: "The lookup didn't work just now. Try again in a minute." };
+    console.error("Address lookup failed", err);
+    return { address, error: "The lookup didn't work just now. Try again in a minute." };
   }
 }
 
