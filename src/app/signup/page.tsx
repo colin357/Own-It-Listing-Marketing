@@ -18,7 +18,7 @@ export default async function SignupPage({ searchParams }: PageProps<"/signup">)
           <p className="eyebrow">{PLAN.trialDays} days free</p>
           <h1 className="display display-md">Start your free trial</h1>
           <p className="lead muted">
-            Tell us who you are. Next you&apos;ll add a card and upload your headshot and logo. Our team takes care of setting up your agents.
+            Tell us who you are. Next you&apos;ll add a card. Then our team gets your headshot and logo and sets up your agents.
           </p>
           <ul className="signup-points">
             <li>${PLAN.priceUsd}/month after the {PLAN.trialDays}-day trial</li>

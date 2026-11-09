@@ -223,7 +223,7 @@ export async function sendAccountLink(lo: LoanOfficer, origin: string, welcome =
   const first = lo.name.split(/\s+/)[0];
   const body = welcome
     ? `<p style="font-size:16px;line-height:1.6;margin:0 0 14px">Hi ${esc(first)},</p>
-    <p style="font-size:16px;line-height:1.6;margin:0 0 14px">Welcome to Listing Kits. Add your headshot and company logo now. Our team will reach out to set up the agents you work with and the areas you cover.</p>
+    <p style="font-size:16px;line-height:1.6;margin:0 0 14px">Welcome to Listing Kits. Our team will reach out to get your headshot and logo and to set up the agents you work with and the areas you cover.</p>
     ${button(link, "Finish setup")}
     <p style="font-size:14px;line-height:1.6;margin:0 0 14px;color:#5b5b5b">Once your agents are set up, we check for their new listings every Monday and Thursday morning and email you each finished kit. You can build a kit for any listing yourself from your account page today.</p>
     <p style="font-size:14px;line-height:1.6;margin:0;color:#5b5b5b">Keep this email: the button is your private sign-in link.</p>`

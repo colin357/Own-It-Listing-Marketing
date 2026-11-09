@@ -4,11 +4,10 @@ import type { Metadata } from "next";
 import { listings, loanOfficers } from "@/lib/store";
 import { buildPath, validAccountToken } from "@/lib/loLinks";
 import { loanOfficerToValues } from "@/lib/formValues";
-import { blobMode } from "@/lib/blob";
 import { billingLabel, CONTACT_EMAIL, isActive, PLAN } from "@/lib/plan";
 import { formatPrice, streetLine } from "@/lib/format";
 import { SiteFooter, SiteHeader } from "@/components/site/SiteChrome";
-import { ImageUpload, ProfileForm } from "./AccountForms";
+import { ProfileForm } from "./AccountForms";
 import "../../../site.css";
 
 export const metadata: Metadata = { title: "Your account · Listing Kits", robots: { index: false, follow: false } };
@@ -25,12 +24,6 @@ export default async function AccountPage({ params, searchParams }: PageProps<"/
   const self = !!lo.billing;
   const build = buildPath(slug);
   const recent = all.filter((l) => l.loanOfficerSlug === slug).slice(0, 8);
-  const steps = [
-    { done: !!lo.headshotUrl, label: "Add your headshot" },
-    { done: !!lo.logoUrl, label: "Add your company logo" },
-    { done: !!lo.applyUrl, label: "Add your pre-approval link (for the flyer QR code)" },
-  ];
-  const ready = steps.every((s) => s.done);
 
   return (
     <div className="site">
@@ -69,17 +62,14 @@ export default async function AccountPage({ params, searchParams }: PageProps<"/
           </div>
         ) : null}
 
-        {self && active && !ready ? (
+        {self && active ? (
           <section className="acct-steps">
-            <h2 className="site-h2">Finish setup</h2>
-            <p className="muted">Our team will reach out to set up the agents you work with and the areas you cover.</p>
-            <ol>
-              {steps.map((s) => (
-                <li key={s.label} className={s.done ? "is-done" : ""}>
-                  {s.label}
-                </li>
-              ))}
-            </ol>
+            <h2 className="site-h2">What happens next</h2>
+            <p className="muted">
+              Our team will reach out to get your headshot, logo and the agents you work with, and set up the areas you cover.
+              After that, kits for your agents&apos; new listings arrive in your inbox.
+            </p>
+            {!lo.applyUrl ? <p className="muted">Meanwhile, add your pre-approval link below so the flyer QR code points to it.</p> : null}
           </section>
         ) : null}
 
@@ -94,30 +84,6 @@ export default async function AccountPage({ params, searchParams }: PageProps<"/
             </Link>
           </section>
         ) : null}
-
-        <section className="acct-section">
-          <h2 className="site-h2">Photos</h2>
-          <div className="acct-uploads">
-            <ImageUpload
-              slug={slug}
-              token={token}
-              mode={blobMode()}
-              field="headshotUrl"
-              label="Headshot"
-              current={lo.headshotUrl}
-              hint="Goes next to the agent's photo on your graphics."
-            />
-            <ImageUpload
-              slug={slug}
-              token={token}
-              mode={blobMode()}
-              field="logoUrl"
-              label="Company logo"
-              current={lo.logoUrl}
-              hint="PNG with a clear background works best."
-            />
-          </div>
-        </section>
 
         <section className="acct-section">
           <h2 className="site-h2">Your details</h2>

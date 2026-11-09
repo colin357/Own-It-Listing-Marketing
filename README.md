@@ -223,8 +223,8 @@ carry a disclaimer. Have your compliance team review the templates and the payme
 The home page is a public landing page for loan officers. They sign up at `/signup`, add a card in Stripe
 Checkout and get a 7-day free trial, then $150/month (`src/lib/plan.ts`). When the checkout completes, the
 loan officer record is created with a `billing` section and they land on their private account page,
-`/account/<slug>/<token>` (headshot, logo, NMLS, pre-approval link, billing). The welcome email repeats that
-link; `/login` emails it again. Own It adds their agents and areas through the roster and metros upload, as
+`/account/<slug>/<token>` (contact details, NMLS, pre-approval link, billing). The welcome email repeats that
+link; `/login` emails it again. Own It adds their headshot, logo, agents and areas (admin and the roster and metros upload), as
 for every other loan officer.
 
 - Loan officers you add yourself have no `billing` section and are never charged.

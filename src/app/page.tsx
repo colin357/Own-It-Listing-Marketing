@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 const STEPS = [
   {
     title: "Sign up, we set you up",
-    text: "Start your trial and add your headshot and logo. Our team loads the agents you work with and the areas you cover.",
+    text: "Start your free trial. Our team gets your headshot and logo and loads the agents you work with and the areas you cover.",
   },
   {
     title: "We watch for their listings",
@@ -66,8 +66,8 @@ export default function Home() {
             <div className="lp-hero-copy">
               <p className="eyebrow">For mortgage loan officers</p>
               <h1 className="display lp-title">
-                <span>Your agents list.</span>
-                <span>You show up.</span>
+                <span>Listing marketing</span>
+                <span>for your agents.</span>
               </h1>
               <p className="lead lp-lead">
                 Every time one of your agents takes a new listing, we build a full marketing kit with your name on it. Social
