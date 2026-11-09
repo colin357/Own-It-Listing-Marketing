@@ -24,6 +24,7 @@
 .addr-list li.is-active { background: var(--paper); }
 .addr-list li.addr-status { cursor: default; color: var(--muted); font-size: 0.92rem; }
 .addr-list li.addr-status-sm { padding-top: 6px; padding-bottom: 8px; font-size: 0.8rem; }
-.build-agent { border: 0; padding: 0; margin: 0 0 6px; display: grid; gap: 14px; width: 100%; max-width: 440px; }
-.build-agent legend { margin-bottom: 12px; color: var(--muted); }
+.build-agent { display: grid; gap: 14px; width: 100%; max-width: 440px; margin: 4px 0 8px; padding-top: 18px; border-top: 1px solid var(--line); }
+.build-agent-note { font-size: 0.95rem; line-height: 1.5; color: var(--muted); margin: 0; }
 .build-agent input { width: 100%; font-size: 1rem; padding: 12px 14px; }
+.build-agent-switch { justify-self: start; text-align: left; background: none; border: 0; padding: 0; font: inherit; font-size: 0.88rem; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }

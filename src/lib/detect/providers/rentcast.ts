@@ -185,7 +185,7 @@ export async function rentcastByAddress(apiKey: string, address: string): Promis
   const rows = (await res.json()) as RentcastListing[];
   console.info(
     `RentCast address "${address}": ${rows.length} result(s)`,
-    rows.map((r) => `${r.addressLine1} ${r.zipCode} ${r.status} mls=${r.mlsNumber ?? "-"} agent=${r.listingAgent?.name ? "yes" : "no"}`),
+    rows.map((r) => `${r.addressLine1} ${r.zipCode} ${r.status} mls=${r.mlsNumber ?? "-"} agent=${r.listingAgent?.name ? "yes" : "no"} type=${r.listingType ?? "-"} built=${r.yearBuilt ?? "-"}`),
   );
   return rows
     .sort((a, b) => Number(b.status === "Active") - Number(a.status === "Active"))

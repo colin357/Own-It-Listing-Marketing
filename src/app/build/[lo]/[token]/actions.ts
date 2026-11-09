@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { countToday, loanOfficers, uncountToday } from "@/lib/store";
 import { validLoToken } from "@/lib/loLinks";
+import { isNewConstruction } from "@/lib/detect/newConstruction";
 import { findByAddress, findByKey, findInZip, indexKey } from "@/lib/detect/mls";
 import { homeAddress } from "@/lib/detect/dedupe";
 import { buildKitForLo, existingKit } from "@/lib/detect/build";
@@ -24,6 +25,9 @@ export interface FoundListing {
   /** Empty when the feed has no agent (e.g. a builder's listing); the LO types it in. */
   agent: string;
   office?: string;
+  /** Looks like new construction, so ask for the builder instead of an agent. */
+  newConstruction?: boolean;
+  yearBuilt?: number;
   listedDate?: string;
   existingSlug?: string;
 }
@@ -87,6 +91,8 @@ function summary(l: SourceListing, existingSlug?: string): FoundListing {
     mlsNumber: l.mlsNumber,
     agent: l.agent.name,
     office: l.office?.name,
+    newConstruction: isNewConstruction(l),
+    yearBuilt: l.yearBuilt,
     listedDate: l.listedDate,
     existingSlug,
   };
@@ -143,14 +149,30 @@ export async function buildKitAction(slug: string, token: string, _prev: BuildSt
   let listing = await findByKey(text(fd, "key"));
   if (!listing) return { error: "That listing expired from our search. Look it up again." };
   if (!listing.agent.name) {
-    const name = text(fd, "agentName");
-    if (!name) return { error: "Add the listing agent's name so it shows on the graphics." };
-    const brokerage = text(fd, "agentBrokerage");
-    listing = {
-      ...listing,
-      agent: { ...listing.agent, name, phone: text(fd, "agentPhone") || listing.agent.phone },
-      office: brokerage ? { ...listing.office, name: brokerage } : listing.office,
-    };
+    const builder = text(fd, "builder");
+    if (fd.has("builder")) {
+      // New construction: the builder takes the agent's place on the graphics,
+      // with their sales contact named when the LO knows them.
+      if (!builder) return { error: "Add the builder's name so it shows on the graphics." };
+      const contact = text(fd, "salesContact");
+      const community = text(fd, "community");
+      listing = {
+        ...listing,
+        agent: { ...listing.agent, name: contact || builder, phone: text(fd, "agentPhone") || listing.agent.phone },
+        office: contact ? { ...listing.office, name: builder } : listing.office,
+        listingType: "New Construction",
+        ...(community ? { community } : {}),
+      };
+    } else {
+      const name = text(fd, "agentName");
+      if (!name) return { error: "Add the listing agent's name so it shows on the graphics." };
+      const brokerage = text(fd, "agentBrokerage");
+      listing = {
+        ...listing,
+        agent: { ...listing.agent, name, phone: text(fd, "agentPhone") || listing.agent.phone },
+        office: brokerage ? { ...listing.office, name: brokerage } : listing.office,
+      };
+    }
   }
   let kitSlug: string;
   try {

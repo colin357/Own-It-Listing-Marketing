@@ -1,4 +1,5 @@
 import "server-only";
+import { isNewConstruction } from "./newConstruction";
 import { detections, documents, listings, loanOfficers } from "../store";
 import { createListing } from "../listings";
 import { formatNumber, slugify } from "../format";
@@ -33,7 +34,7 @@ function lotSizeLabel(sqft?: number): string | undefined {
 
 function highlightsFor(l: SourceListing): string[] {
   const h: string[] = [];
-  if (l.listingType === "New Construction") h.push("New construction");
+  if (isNewConstruction(l)) h.push(l.community ? `New construction in ${l.community}` : "New construction");
   if (l.yearBuilt) h.push(`Built in ${l.yearBuilt}`);
   const lot = lotSizeLabel(l.lotSizeSqft);
   if (lot && l.lotSizeSqft! >= 10_000) h.push(`${lot} lot`);
