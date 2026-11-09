@@ -3,7 +3,8 @@
 import { redirect } from "next/navigation";
 import { countToday, loanOfficers, uncountToday } from "@/lib/store";
 import { validLoToken } from "@/lib/loLinks";
-import { findByAddress, findByKey, indexKey, normalizeMls } from "@/lib/detect/mls";
+import { findByAddress, findByKey, findInZip, indexKey, normalizeMls } from "@/lib/detect/mls";
+import { homeAddress } from "@/lib/detect/dedupe";
 import { buildKitForLo, existingKit } from "@/lib/detect/build";
 import type { SourceListing } from "@/lib/detect/types";
 import { UnreadableAddressError } from "@/lib/detect/providers/rentcast";
@@ -47,6 +48,34 @@ const ADDRESS_HELP = "Add the city, state and ZIP, like 123 Main St, Austin, TX 
 /** True when the address has a ZIP or ends in a city and two-letter state, so RentCast can place it. */
 function completeAddress(address: string): boolean {
   return /\b\d{5}\b/.test(address) || /,\s*[^,]+,?\s+[A-Za-z]{2}\.?\s*$/.test(address);
+}
+
+/** The five-digit ZIP in a typed address, if any ("..., SC 29470" → "29470"). */
+function zipOf(address: string): string | null {
+  return address.match(/\b(\d{5})(?:-\d{4})?\s*$/)?.[1] ?? address.match(/,[^,]*\b(\d{5})\b/)?.[1] ?? null;
+}
+
+/**
+ * The listing in `pool` the LO meant: same MLS # first, then the same street
+ * address ("Dr" and "Drive" match), then same house number and street name
+ * when only the suffix or a direction differs.
+ */
+function pickListing(pool: SourceListing[], mls: string, address: string, zip: string): SourceListing | null {
+  if (mls) {
+    const byMls = pool.find((l) => l.mlsNumber && normalizeMls(l.mlsNumber) === mls);
+    if (byMls) return byMls;
+  }
+  const typed = homeAddress({ address: address.split(",")[0], zip }).street;
+  const exact = pool.find((l) => homeAddress(l).street === typed);
+  if (exact) return exact;
+  const [num, name] = typed.split(" ");
+  if (!num || !/^\d/.test(num) || !name) return null;
+  return (
+    pool.find((l) => {
+      const [n, ...rest] = homeAddress(l).street.split(" ");
+      return n === num && rest.includes(name);
+    }) ?? null
+  );
 }
 
 function summary(l: SourceListing, existingSlug?: string): FoundListing {
@@ -99,6 +128,13 @@ export async function findListingAction(slug: string, token: string, _prev: Find
         return { mls: mlsInput, address, askAddress: true, error: `We couldn't read that address. ${ADDRESS_HELP}` };
       }
       listing = results.find((l) => mls && l.mlsNumber && normalizeMls(l.mlsNumber) === mls) ?? results[0] ?? null;
+      // RentCast's address search misses some active listings (new streets, new
+      // construction, its own spelling of the address). Look through every active
+      // listing in the ZIP instead, matching by MLS # or street address.
+      const zip = listing ? null : zipOf(address);
+      if (zip && (await countToday(counter)) <= ADDRESS_LOOKUPS_PER_DAY) {
+        listing = pickListing(await findInZip(zip), mls, address, zip);
+      }
       if (!listing)
         return {
           mls: mlsInput,
