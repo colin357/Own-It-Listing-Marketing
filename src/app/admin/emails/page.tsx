@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function EmailsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const sp = await searchParams;
   const msg = typeof sp.msg === "string" ? sp.msg : "";
-  const { digests, skipped, repeats } = await pendingDigests(await siteUrl());
+  const { digests, skipped, repeats, noPhotos } = await pendingDigests(await siteUrl());
   const ready = mailConfigured();
   const total = digests.reduce((n, d) => n + d.kits.length, 0);
 
@@ -54,6 +54,12 @@ export default async function EmailsPage({ searchParams }: { searchParams: Promi
         <p className="muted small">
           Left out as repeats (same home the loan officer already got under another address):{" "}
           {repeats.map((r) => `${r.listing.address}${r.listing.unit ? ` ${r.listing.unit}` : ""}, ${r.listing.city}`).join("; ")}.
+        </p>
+      ) : null}
+      {noPhotos.length ? (
+        <p className="muted small">
+          Waiting for photos ({noPhotos.length}), sent in the first email after their photos arrive:{" "}
+          {noPhotos.map((w) => `${w.listing.address}${w.listing.unit ? ` ${w.listing.unit}` : ""}, ${w.listing.city} (${w.loName})`).join("; ")}.
         </p>
       ) : null}
       {skipped.length ? (

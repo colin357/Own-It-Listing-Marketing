@@ -12,7 +12,9 @@ import type { Listing, LoanOfficer } from "./types";
  * After each detection run, every loan officer gets one email listing the new
  * kits for their agents, with links and a message to forward to each agent.
  * A kit is emailed once (Detection.emailedAt), and a home is emailed to a
- * loan officer once even if it has two kits (see detect/dedupe.ts).
+ * loan officer once even if it has two kits (see detect/dedupe.ts). A kit
+ * with no listing photos isn't emailed: it waits, unsent, and goes out in the
+ * first email after its photos arrive (from Zillow or the agent's upload).
  */
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -185,10 +187,21 @@ export interface RepeatKit {
   duplicateOf: string;
 }
 
-/** Kits not emailed yet, grouped by loan officer, with repeats of the same home left out. */
+/** A kit held back from the email because it has no listing photos yet. */
+export interface WaitingKit {
+  det: Detection;
+  listing: Listing;
+  loName: string;
+}
+
+/**
+ * Kits not emailed yet, grouped by loan officer, with repeats of the same home
+ * left out. Kits without photos are returned as `noPhotos` and left unsent, so
+ * a later run emails them once their photos are in.
+ */
 export async function pendingDigests(
   origin: string,
-): Promise<{ digests: Digest[]; skipped: string[]; repeats: RepeatKit[] }> {
+): Promise<{ digests: Digest[]; skipped: string[]; repeats: RepeatKit[]; noPhotos: WaitingKit[] }> {
   const [all, los] = await Promise.all([detections.list(), loanOfficers.list()]);
   const byLo = new Map<string, { det: Detection; listing: Listing }[]>();
   for (const det of all) {
@@ -201,6 +214,7 @@ export async function pendingDigests(
   const digests: Digest[] = [];
   const skipped: string[] = [];
   const repeats: RepeatKit[] = [];
+  const noPhotos: WaitingKit[] = [];
   for (const [slug, pending] of byLo) {
     const lo = los.find((x) => x.slug === slug);
     if (!lo) continue;
@@ -214,10 +228,13 @@ export async function pendingDigests(
     );
     const kits: { det: Detection; listing: Listing }[] = [];
     for (const k of pending) {
+      // Only kits with photos go into `kits`, so a photo-less kit is never
+      // marked as a repeat of another photo-less kit that is still waiting.
       const same =
         sent.find((d) => sameHome(d.listing, k.det.listing)) ??
         kits.find((x) => sameHome(x.det.listing, k.det.listing))?.det;
       if (same) repeats.push({ ...k, duplicateOf: same.slug });
+      else if (!k.listing.photos.length) noPhotos.push({ ...k, loName: lo.name });
       else kits.push(k);
     }
     if (!kits.length) continue;
@@ -229,7 +246,8 @@ export async function pendingDigests(
     digests.push({ lo, kits, ...renderDigest(lo, kits.map((k) => k.listing), origin) });
   }
   digests.sort((a, b) => a.lo.name.localeCompare(b.lo.name));
-  return { digests, skipped, repeats };
+  noPhotos.sort((a, b) => a.loName.localeCompare(b.loName) || a.listing.address.localeCompare(b.listing.address));
+  return { digests, skipped, repeats, noPhotos };
 }
 
 /**
@@ -241,10 +259,11 @@ export async function testDigest(origin: string): Promise<{ loName: string; subj
   const { digests } = await pendingDigests(origin);
   if (digests[0]) return { loName: digests[0].lo.name, subject: digests[0].subject, html: digests[0].html };
   const [all, los] = await Promise.all([listings.list(), loanOfficers.list()]);
-  const newest = [...all].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const newest = all.filter((l) => l.photos.length).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const lo = los.find((x) => x.slug === newest[0]?.loanOfficerSlug);
   if (!lo) return null;
-  const kits = newest.filter((l) => l.loanOfficerSlug === lo.slug).slice(0, 3);
+  const kits = newest.filter((l) => l.loanOfficerSlug === lo.slug && l.photos.length).slice(0, 3);
+  if (!kits.length) return null;
   return { loName: lo.name, ...renderDigest(lo, kits, origin) };
 }
 
