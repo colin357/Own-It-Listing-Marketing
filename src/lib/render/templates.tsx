@@ -31,7 +31,7 @@ import { activeConcession, concessionSentence, concessionTag } from "../concessi
  */
 
 /** Bump when templates change so cached PNGs/PDFs are re-rendered. */
-export const TEMPLATE_VERSION = "8";
+export const TEMPLATE_VERSION = "9";
 
 /** Cache key for a listing's graphics: changes with the templates, the listing and the rates shown. */
 export function assetVersion(l: Listing): string {
@@ -211,12 +211,12 @@ function showsLo(d: RenderData): boolean {
 }
 
 /**
- * Headshots for the agent + loan officer pair. Both or neither, so the loan
- * officer never looks like the star of the agent's listing.
+ * Headshots for the agent and loan officer. Each shows whenever it exists, so
+ * the LO's photo is on the flyer from the start and the agent's joins it,
+ * next to their own details, once they upload one on the kit page.
  */
 function pairPhotos(d: RenderData): { agent: string | null; lo: string | null } {
-  if (!showsLo(d)) return { agent: d.agentHeadshot, lo: null };
-  return d.agentHeadshot && d.loHeadshot ? { agent: d.agentHeadshot, lo: d.loHeadshot } : { agent: null, lo: null };
+  return { agent: d.agentHeadshot, lo: showsLo(d) ? d.loHeadshot : null };
 }
 
 function agentPerson(d: RenderData, size: number, color: string, subColor: string, ring: string) {
