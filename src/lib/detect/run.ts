@@ -3,7 +3,7 @@ import { isNewConstruction } from "./newConstruction";
 import { detections, documents, listings, loanOfficers } from "../store";
 import { createListing } from "../listings";
 import { formatNumber, slugify } from "../format";
-import type { Listing, LoanOfficer } from "../types";
+import type { Listing, ListingStatus, LoanOfficer } from "../types";
 import { AUTO_CONFIDENCE, buildMatcher, nameParts, type Match } from "./match";
 import { detectionInputs } from "./roster";
 import { isActive } from "../plan";
@@ -43,11 +43,15 @@ function highlightsFor(l: SourceListing): string[] {
 }
 
 /** Creates the listing kit for a detection and records where it came from. */
-export async function createKitFromDetection(det: Detection, lo: LoanOfficer): Promise<Listing> {
+export async function createKitFromDetection(
+  det: Detection,
+  lo: LoanOfficer,
+  status: ListingStatus = "just-listed",
+): Promise<Listing> {
   const s = det.listing;
   const created = await createListing({
     loanOfficerSlug: lo.slug,
-    status: "just-listed",
+    status,
     address: s.address,
     unit: s.unit,
     city: s.city,

@@ -8,6 +8,7 @@ import { lookupPhotos, photoSource } from "./providers";
 import { createKitFromDetection } from "./run";
 import { normalizeMls } from "./mls";
 import { queuePhotos } from "./photo-queue";
+import { isNewConstruction } from "./newConstruction";
 import type { Detection, RosterAgent, SourceListing } from "./types";
 
 /**
@@ -87,7 +88,9 @@ export async function buildKitForLo(lo: LoanOfficer, source: SourceListing): Pro
     createdAt: now,
     updatedAt: now,
   };
-  const kit = await createKitFromDetection(det, lo);
+  // A loan officer builds a kit by hand when the home has been on the market a while,
+  // so it isn't "Just Listed". Detected kits from the automatic runs keep "Just Listed".
+  const kit = await createKitFromDetection(det, lo, listing.builder || isNewConstruction(listing) ? "new-construction" : "featured");
 
   // Mark the listing handled for detection, unless it belongs to another loan officer's agent
   // (they should still get their own kit) or someone already decided on it.
