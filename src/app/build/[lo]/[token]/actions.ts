@@ -43,6 +43,9 @@ async function authorizedLo(slug: string, token: string) {
 
 const text = (fd: FormData, name: string) => String(fd.get(name) ?? "").trim();
 
+const LIMIT_MESSAGE =
+  "You've reached today's limit for address searches. MLS numbers we already have still work, and address search resets tomorrow. Need this one sooner? Contact Own It Social.";
+
 const ADDRESS_HELP = "Add the city, state and ZIP, like 123 Main St, Austin, TX 78704.";
 
 /** True when the address has a ZIP or ends in a city and two-letter state, so RentCast can place it. */
@@ -112,13 +115,8 @@ export async function findListingAction(slug: string, token: string, _prev: Find
     if (!listing && address) {
       if (!completeAddress(address)) return { mls: mlsInput, address, askAddress: true, error: ADDRESS_HELP };
       const counter = `address-lookup:${lo.slug}`;
-      if ((await countToday(counter)) > ADDRESS_LOOKUPS_PER_DAY)
-        return {
-          mls: mlsInput,
-          address,
-          askAddress: true,
-          error: `That's the ${ADDRESS_LOOKUPS_PER_DAY} address lookups for today. Try again tomorrow.`,
-        };
+      const limitReached: FindState = { mls: mlsInput, address, askAddress: true, error: LIMIT_MESSAGE };
+      if ((await countToday(counter)) > ADDRESS_LOOKUPS_PER_DAY) return limitReached;
       let results: SourceListing[];
       try {
         results = await findByAddress(address);
@@ -132,7 +130,8 @@ export async function findListingAction(slug: string, token: string, _prev: Find
       // construction, its own spelling of the address). Look through every active
       // listing in the ZIP instead, matching by MLS # or street address.
       const zip = listing ? null : zipOf(address);
-      if (zip && (await countToday(counter)) <= ADDRESS_LOOKUPS_PER_DAY) {
+      if (zip) {
+        if ((await countToday(counter)) > ADDRESS_LOOKUPS_PER_DAY) return limitReached;
         listing = pickListing(await findInZip(zip), mls, address, zip);
       }
       if (!listing)
