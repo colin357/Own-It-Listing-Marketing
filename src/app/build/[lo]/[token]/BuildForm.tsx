@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import { AddressInput } from "./AddressInput";
+import { AgentFields } from "./AgentFields";
 import { buildKitAction, findListingAction, type BuildState, type FindState } from "./actions";
 
 const money = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
@@ -57,24 +58,12 @@ export function BuildForm({ slug, token, photos }: { slug: string; token: string
             <form action={build} className="build-actions">
               <input type="hidden" name="key" value={f.key} />
               {!f.agent ? (
-                <fieldset className="build-agent">
-                  <legend className="small">
-                    Our listing feed doesn&apos;t name the agent for this home (common with new construction). Add them
-                    so they show on the graphics.
-                  </legend>
-                  <label className="field">
-                    <span className="field-label">Listing agent</span>
-                    <input name="agentName" required placeholder="Full name" autoComplete="off" />
-                  </label>
-                  <label className="field">
-                    <span className="field-label">Brokerage</span>
-                    <input name="agentBrokerage" defaultValue={f.office} placeholder="Optional" autoComplete="off" />
-                  </label>
-                  <label className="field">
-                    <span className="field-label">Agent phone</span>
-                    <input name="agentPhone" type="tel" placeholder="Optional" autoComplete="off" />
-                  </label>
-                </fieldset>
+                <AgentFields
+                  key={f.key}
+                  newConstruction={f.newConstruction}
+                  yearBuilt={f.yearBuilt}
+                  office={f.office}
+                />
               ) : null}
               <button className="pill" disabled={building}>
                 {building ? "Building your kit…" : "Build the kit"}

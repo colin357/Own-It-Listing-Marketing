@@ -59,6 +59,8 @@ export interface SourceListing {
   listedDate?: string;
   photos: string[];
   description?: string;
+  /** New-construction community or subdivision, typed in by the LO. */
+  community?: string;
   /** Public listing page, when a photo source found one. */
   listingUrl?: string;
   agent: { name: string; phone?: string; email?: string; website?: string };
