@@ -5,7 +5,8 @@ import { createListing } from "../listings";
 import { formatNumber, slugify } from "../format";
 import type { Listing, LoanOfficer } from "../types";
 import { AUTO_CONFIDENCE, buildMatcher, nameParts, type Match } from "./match";
-import { getMetros, getRoster } from "./roster";
+import { detectionInputs } from "./roster";
+import { isActive } from "../plan";
 import { listingProvider, lookupPhotos, photoSource } from "./providers";
 import { applyPhotos, processPhotoQueue, queuePhotos } from "./photo-queue";
 import type { Detection, DetectionRun, SourceListing } from "./types";
@@ -142,12 +143,10 @@ export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin
   const startedAt = new Date(startMs).toISOString();
   const provider = listingProvider();
   if (!provider) throw new Error("No listings feed configured. Set RENTCAST_API_KEY.");
-  const [roster, metros, los, known] = await Promise.all([
-    getRoster(),
-    getMetros(),
-    loanOfficers.list(),
-    detections.list(),
-  ]);
+  const [allLos, known] = await Promise.all([loanOfficers.list(), detections.list()]);
+  // Self-signup loan officers whose subscription lapsed get no new kits.
+  const los = allLos.filter(isActive);
+  const { roster, metros } = await detectionInputs(allLos);
   if (!roster.length || !metros.length) throw new Error("Upload the agent roster and metros first (Admin → Roster).");
 
   const match = buildMatcher(roster, metros);

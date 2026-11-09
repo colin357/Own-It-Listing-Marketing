@@ -218,6 +218,25 @@ Templates include NMLS numbers and Equal Housing Opportunity on every asset, and
 carry a disclaimer. Have your compliance team review the templates and the payment disclaimer
 (`src/lib/format.ts`) before going live; LOs can add state-specific text in their profile.
 
+## Paid self-signup (kits.ownitsocial.com)
+
+The home page is a public landing page for loan officers. They sign up at `/signup`, add a card in Stripe
+Checkout and get a 7-day free trial, then $150/month (`src/lib/plan.ts`). When the checkout completes, the
+loan officer record is created with a `billing` section and they land on their private account page,
+`/account/<slug>/<token>` (headshot, logo, NMLS, pre-approval link, billing). The welcome email repeats that
+link; `/login` emails it again. Own It adds their agents and areas through the roster and metros upload, as
+for every other loan officer.
+
+- Loan officers you add yourself have no `billing` section and are never charged.
+- Trialing, active and past-due subscriptions get kits. Once a subscription is canceled or unpaid, their roster
+  rows and areas are skipped in the listing search, they get no LO emails and the kit builder is closed. Kits
+  already sent keep working. "Restart subscription" on the account page opens a new checkout (no second trial).
+- Stripe setup: set `STRIPE_SECRET_KEY`, then add a webhook endpoint at `/api/stripe/webhook` for
+  `checkout.session.completed` and `customer.subscription.created|updated|deleted` and set its secret as
+  `STRIPE_WEBHOOK_SECRET`. Turn on the customer portal (Settings → Billing → Customer portal) so "Manage billing"
+  works. The $150/month price is created on the first checkout (lookup key `listing-kits-monthly-150`).
+- Landing page graphics are rendered live from the demo listing in `/data` (`/sample/<name>.png`).
+
 ## Loan officer emails
 
 After every real run, each loan officer gets one email listing the kits created for their agents since their last

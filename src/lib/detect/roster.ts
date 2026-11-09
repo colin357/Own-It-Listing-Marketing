@@ -1,5 +1,7 @@
 import "server-only";
-import { documents } from "../store";
+import { documents, loanOfficers } from "../store";
+import { isActive } from "../plan";
+import type { LoanOfficer } from "../types";
 import { ValidationError } from "../validate";
 import type { Metro, RosterAgent } from "./types";
 import { lookupZip, splitZips } from "./zips";
@@ -162,4 +164,22 @@ export async function saveRoster(agents: RosterAgent[]) {
 
 export async function saveMetros(metros: Metro[]) {
   await documents.set("metros", metros);
+}
+
+/**
+ * The roster and metros the listing search uses: the uploaded ones, minus
+ * rows for self-signup loan officers whose subscription lapsed, so they stop
+ * costing feed requests and stop getting kits.
+ */
+export async function detectionInputs(los?: LoanOfficer[]): Promise<{ roster: RosterAgent[]; metros: Metro[] }> {
+  const [roster, metros, all] = await Promise.all([getRoster(), getMetros(), los ?? loanOfficers.list()]);
+  const key = (n: string) => n.trim().toLowerCase().replace(/\s+/g, " ");
+  const lapsed = new Set(all.filter((lo) => !isActive(lo)).map((lo) => key(lo.name)));
+  if (!lapsed.size) return { roster, metros };
+  return {
+    roster: roster.filter((a) => !lapsed.has(key(a.loanOfficer))),
+    metros: metros
+      .map((m) => ({ ...m, loanOfficers: m.loanOfficers.filter((n) => !lapsed.has(key(n))) }))
+      .filter((m) => m.loanOfficers.length),
+  };
 }
