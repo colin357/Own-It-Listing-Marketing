@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
+import { siteUrl } from "@/lib/site";
 import { createCheckout, findByEmail, sendAccountLink, stripeConfigured, type SignupInput } from "@/lib/billing";
 import { isActive } from "@/lib/plan";
 import { countToday } from "@/lib/store";
@@ -12,13 +12,6 @@ export interface SignupState {
   values?: Record<string, string>;
 }
 
-async function origin(): Promise<string> {
-  if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "");
-  const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
-  const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
-  return `${proto}://${host}`;
-}
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -33,7 +26,7 @@ export async function signupAction(_prev: SignupState, fd: FormData): Promise<Si
   if (issues.length) return { issues, values };
   if (!stripeConfigured()) return { issues: ["Signups open soon. Email us and we'll set you up."], values };
 
-  const site = await origin();
+  const site = await siteUrl();
   const existing = (await findByEmail(values.email)).find((lo) => lo.billing && isActive(lo));
   if (existing) {
     if ((await countToday(`login:${values.email.toLowerCase()}`)) <= 5) await sendAccountLink(existing, site);
