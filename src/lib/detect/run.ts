@@ -9,6 +9,7 @@ import { listingProvider, lookupPhotos, photoSource } from "./providers";
 import { applyPhotos, processPhotoQueue, queuePhotos } from "./photo-queue";
 import type { Detection, DetectionRun, SourceListing } from "./types";
 import { refreshMarketRates } from "../rates";
+import { savedHeadshot } from "../agentHeadshots";
 import { indexListings } from "./mls";
 import { findSameHome, sameHome } from "./dedupe";
 
@@ -64,7 +65,8 @@ export async function createKitFromDetection(det: Detection, lo: LoanOfficer): P
       phone: s.agent.phone ?? det.rosterAgent.phone,
       email: s.agent.email ?? det.rosterAgent.email,
       brokerage: s.office?.name ?? det.rosterAgent.brokerage,
-      headshotUrl: det.rosterAgent.headshotUrl,
+      // A headshot the agent uploaded on an earlier kit beats the roster's.
+      headshotUrl: (await savedHeadshot(s.agent.name)) ?? det.rosterAgent.headshotUrl,
     },
     listingUrl: s.listingUrl,
   });

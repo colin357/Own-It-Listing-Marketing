@@ -38,7 +38,15 @@ export function assetVersion(l: Listing): string {
   const f = l.financing;
   const rates = f && l.showPayment ? [f.ratePct, f.aprPct, f.fhaRatePct, f.vaRatePct].join("_") : "none";
   const credit = l.concession ? `${l.concession.amount}${l.concession.type}` : "0";
-  return `${TEMPLATE_VERSION}-${l.updatedAt}-${rates}-${credit}`;
+  // A headshot saved on another of the agent's kits changes this kit's graphics too.
+  const headshot = l.agent.headshotUrl ? shortHash(l.agent.headshotUrl) : "0";
+  return `${TEMPLATE_VERSION}-${l.updatedAt}-${rates}-${credit}-${headshot}`;
+}
+
+function shortHash(s: string): string {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
 }
 
 export interface RenderData {

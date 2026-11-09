@@ -331,6 +331,13 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent);
 /* ---------- kit: buyer page link ---------- */
 .buyer-link { display: grid; gap: 10px; }
 .buyer-link .actions { margin-top: 6px; }
+.headshot-intake { display: flex; gap: 20px; align-items: center; margin-top: 32px; padding-top: 28px; border-top: 1px solid var(--line); }
+.headshot-preview { width: 88px; height: 88px; border-radius: 50%; object-fit: cover; flex: none; border: 1px solid var(--line); }
+.headshot-empty { display: block; background: var(--paper); }
+.headshot-copy { display: grid; gap: 8px; justify-items: start; }
+.headshot-copy label { cursor: pointer; margin-top: 4px; }
+.headshot-copy label.is-busy { opacity: 0.5; cursor: progress; }
+@media (max-width: 640px) { .headshot-intake { gap: 16px; align-items: flex-start; } .headshot-preview { width: 64px; height: 64px; } }
 
 /* Admin buttons that show they're running (PendingButton). */
 .pending-wrap { position: relative; display: inline-flex; flex-direction: column; align-items: flex-end; }
