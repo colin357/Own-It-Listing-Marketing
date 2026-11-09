@@ -73,6 +73,9 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
   const loFirst = lo.name.split(" ")[0];
   const [wordA, wordB] = splitName(lo.name);
   const statusWords = statusLabel(l).toUpperCase().split(" ");
+  // Long words ("CONSTRUCTION.") need a smaller hero headline to fit the screen.
+  const longest = Math.max(...statusWords.map((w) => w.length));
+  const heroSize = longest >= 11 ? " display-xlong" : longest >= 8 ? " display-long" : "";
   const tel = lo.phone ? `tel:${lo.phone.replace(/[^\d+]/g, "")}` : null;
   const credit = activeConcession(l);
   // The calculator starts from the payments without any credit and applies it live.
@@ -167,7 +170,7 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
           </span>
         </a>
         <div className="wrap hero-content">
-          <h1 className="display">
+          <h1 className={`display${heroSize}`}>
             {statusWords.map((w, i) => (
               <span key={w}>
                 {w}

@@ -123,6 +123,7 @@ function normalizeStatus(v: unknown): ListingStatus {
   if (s in LISTING_STATUSES) return s as ListingStatus;
   if (s === "sold") return "just-sold";
   if (s === "pending") return "under-contract";
+  if (s === "featured-listing") return "featured";
   if (s === "price-reduced" || s === "price-reduction" || s === "price-improvement") return "price-improved";
   return "just-listed";
 }

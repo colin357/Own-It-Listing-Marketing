@@ -56,7 +56,9 @@ export function agentEmailBody(l: Listing, lo: LoanOfficer | null, origin: strin
   ];
   return [
     `Hi${who ? ` ${who}` : ""},`,
-    `Congrats on your new listing at ${streetLine(l)}! I put together a free marketing kit for it, made for this home and ready to post, print or send.`,
+    l.status === "just-listed"
+      ? `Congrats on your new listing at ${streetLine(l)}! I put together a free marketing kit for it, made for this home and ready to post, print or send.`
+      : `I put together a free marketing kit for your listing at ${streetLine(l)}, made for this home and ready to post, print or send.`,
     `YOUR KIT\n${kitUrl}`,
     ...(l.photos.length
       ? []

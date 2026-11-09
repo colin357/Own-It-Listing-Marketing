@@ -1,6 +1,9 @@
 export const LISTING_STATUSES = {
   "coming-soon": "Coming Soon",
   "just-listed": "Just Listed",
+  // Kits a loan officer builds by hand are for homes that have been on the market a while.
+  featured: "Featured Listing",
+  "new-construction": "New Construction",
   "open-house": "Open House",
   "price-improved": "Price Improved",
   "under-contract": "Under Contract",
