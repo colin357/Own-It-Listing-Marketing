@@ -32,7 +32,7 @@ export default async function BuildPage({ params }: PageProps<"/build/[lo]/[toke
         <p className="eyebrow">Hi {lo.name.split(/\s+/)[0]}</p>
         <h1 className="display display-md">Build a listing kit</h1>
         <p className="lead muted build-lead">
-          Enter the MLS number and address of any active listing. We pull the home details and photos and build the full kit
+          Enter the address of any active listing. We pull the home details and photos and build the full kit
           (social posts, flyers, captions and emails) co-branded with you, ready to send to the agent.
         </p>
         <BuildForm slug={slug} token={token} photos={!!photoSource()} />
