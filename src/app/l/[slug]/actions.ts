@@ -6,6 +6,7 @@ import { normalizeBuydown } from "@/lib/validate";
 import { offerAmount, offeredBuydowns } from "@/lib/concessions";
 import { getKit } from "@/lib/listings";
 import { programOptions } from "@/lib/mortgage";
+import { isUploadedHeadshot, saveHeadshot } from "@/lib/agentHeadshots";
 import type { Concession } from "@/lib/types";
 
 const MAX_AGENT_PHOTOS = 30;
@@ -29,6 +30,21 @@ export async function addAgentPhotosAction(slug: string, urls: string[]): Promis
   if (!photos.length) return { error: "No photos uploaded" };
   await listings.save({ ...listing, photos, updatedAt: new Date().toISOString() });
   revalidatePath(`/l/${slug}`);
+  return {};
+}
+
+/**
+ * Saves the agent's headshot on this kit and on the agent, so their other
+ * kits (and future ones) use it too.
+ */
+export async function saveAgentHeadshotAction(slug: string, url: string): Promise<{ error?: string }> {
+  const listing = await listings.get(slug);
+  if (!listing) return { error: "Listing not found" };
+  if (!isUploadedHeadshot(url, slug)) return { error: "Upload didn't finish. Try again." };
+  await saveHeadshot(listing.agent.name, url);
+  await listings.save({ ...listing, agent: { ...listing.agent, headshotUrl: url }, updatedAt: new Date().toISOString() });
+  revalidatePath(`/l/${slug}`);
+  revalidatePath(`/home/${slug}`);
   return {};
 }
 

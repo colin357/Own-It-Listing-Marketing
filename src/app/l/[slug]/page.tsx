@@ -20,6 +20,7 @@ import { ASSETS, assetsFor, assetVersion, isPrintAsset, type AssetName } from "@
 import { CopyButton } from "@/components/CopyButton";
 import { ShareButton } from "@/components/ShareButton";
 import { AgentPhotoUpload } from "@/components/AgentPhotoUpload";
+import { AgentHeadshotUpload } from "@/components/AgentHeadshotUpload";
 import { blobMode } from "@/lib/blob";
 import { programOptions } from "@/lib/mortgage";
 import { activeConcession, concessionTag, isLuxury } from "@/lib/concessions";
@@ -239,6 +240,9 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
                 </a>
               </div>
             </div>
+            {blobMode() ? (
+              <AgentHeadshotUpload slug={l.slug} mode={blobMode()!} current={l.agent.headshotUrl} name={l.agent.name} />
+            ) : null}
           </div>
         </div>
       </section>
