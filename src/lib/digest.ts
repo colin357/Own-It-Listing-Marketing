@@ -26,6 +26,11 @@ export interface Digest {
   html: string;
 }
 
+/** Turn bare https links in already-escaped text into real links (desktop Outlook doesn't do it). */
+function linkify(escaped: string): string {
+  return escaped.replace(/https?:\/\/[^\s<]+/g, (u) => `<a href="${u}" target="_blank" style="color:#0a0a0a">${u}</a>`);
+}
+
 function agentMessage(l: Listing, kitUrl: string): string {
   const who = firstName(l.agent.name);
   return `Hi${who ? ` ${who}` : ""}, congrats on ${streetLine(l)}! I put together a free marketing kit for it: social posts, flyers, captions and emails, all ready to download. ${kitUrl}`;
@@ -33,38 +38,98 @@ function agentMessage(l: Listing, kitUrl: string): string {
 
 const EMAIL_RE = /^[^\s@,;<>"]+@[^\s@,;<>"]+\.[^\s@,;<>"]+$/;
 
-/**
- * Plain-text body of the kit email to the listing agent. A mailto: draft can't
- * carry HTML, so it's laid out with short CAPS headings, numbered steps and
- * links on their own lines (mail apps turn those into tappable links). It tells
- * the agent what each part of the kit is for and how to use it.
- */
-export function agentEmailBody(l: Listing, lo: LoanOfficer | null, origin: string): string {
+/** One part of the kit email to the listing agent, shared by the plain-text and HTML versions. */
+type EmailPart =
+  | { kind: "p"; text: string }
+  | { kind: "link"; heading?: string; text?: string; url: string }
+  | { kind: "steps"; heading: string; steps: { label: string; text: string; url?: string }[] };
+
+/** What the kit email to the listing agent says, before it's laid out as text or HTML. */
+function agentEmailParts(l: Listing, lo: LoanOfficer | null, origin: string): EmailPart[] {
   const kitUrl = `${origin}/l/${l.slug}`;
   const who = firstName(l.agent.name);
   const forSale = l.status !== "just-sold" && l.status !== "under-contract";
   // The seller credit section only shows on kits that show payments.
   const sellerCredit = forSale && !!lo && !!programOptions({ ...l, concession: undefined }, lo);
-  const steps = [
-    `Social posts: Save a post or story and share it on Instagram, Facebook or LinkedIn. Captions are written for you, just tap Copy.`,
-    `Flyers: Print the flyer for showings and open houses. The QR code takes buyers to the home's page.`,
-    `Buyer page: Text or post this link. Buyers see photos, details${lo?.showPayments === false ? "" : " and payments"}, and can call you for a tour in one tap:\n${origin}${buyerPagePath(l.slug)}`,
+  const steps: { label: string; text: string; url?: string }[] = [
+    { label: "Social posts", text: "Save a post or story and share it on Instagram, Facebook or LinkedIn. Captions are written for you, just tap Copy." },
+    { label: "Flyers", text: "Print the flyer for showings and open houses. The QR code takes buyers to the home's page." },
+    {
+      label: "Buyer page",
+      text: `Text or post this link. Buyers see photos, details${lo?.showPayments === false ? "" : " and payments"}, and can call you for a tour in one tap:`,
+      url: `${origin}${buyerPagePath(l.slug)}`,
+    },
     ...(sellerCredit
-      ? [`Seller credit: If your seller will help with buyer costs, pick an option and every graphic and flyer updates to show the lower payment.`]
+      ? [{ label: "Seller credit", text: "If your seller will help with buyer costs, pick an option and every graphic and flyer updates to show the lower payment." }]
       : []),
-    `Emails: Ready-to-send emails for your sphere and buyers are at the bottom of the kit.`,
+    { label: "Emails", text: "Ready-to-send emails for your sphere and buyers are at the bottom of the kit." },
   ];
   return [
-    `Hi${who ? ` ${who}` : ""},`,
-    `Congrats on your new listing at ${streetLine(l)}! I put together a free marketing kit for it, made for this home and ready to post, print or send.`,
-    `YOUR KIT\n${kitUrl}`,
+    { kind: "p", text: `Hi${who ? ` ${who}` : ""},` },
+    { kind: "p", text: `Congrats on your new listing at ${streetLine(l)}! I put together a free marketing kit for it, made for this home and ready to post, print or send.` },
+    { kind: "link", heading: "YOUR KIT", url: kitUrl },
     ...(l.photos.length
       ? []
-      : [`We couldn't find your listing photos yet. Add them at the top of the kit and every graphic updates.`]),
-    `HOW TO USE IT\n\n${steps.map((t, i) => `${i + 1}. ${t}`).join("\n\n")}`,
-    `Download everything at once:\n${kitUrl}/download`,
-    `Let me know if you'd like anything changed. And send any buyers with financing questions my way!`,
-  ].join("\n\n");
+      : [{ kind: "p" as const, text: "We couldn't find your listing photos yet. Add them at the top of the kit and every graphic updates." }]),
+    { kind: "steps", heading: "HOW TO USE IT", steps },
+    { kind: "link", text: "Download everything at once:", url: `${kitUrl}/download` },
+    { kind: "p", text: "Let me know if you'd like anything changed. And send any buyers with financing questions my way!" },
+  ];
+}
+
+export function agentEmailSubject(l: Listing): string {
+  return `Your marketing kit for ${streetLine(l)}`;
+}
+
+/**
+ * Plain-text body of the kit email to the listing agent, for the mailto: draft
+ * (which can't carry HTML). Short CAPS headings, numbered steps and links on
+ * their own lines. Phone mail apps turn bare links into tappable ones, but
+ * desktop Outlook doesn't, so desktop senders get the HTML version
+ * (agentEmailHtml) from the "On a computer?" page instead.
+ */
+export function agentEmailBody(l: Listing, lo: LoanOfficer | null, origin: string): string {
+  return agentEmailParts(l, lo, origin)
+    .map((p) => {
+      if (p.kind === "p") return p.text;
+      if (p.kind === "link") return [p.heading, p.text, p.url].filter(Boolean).join("\n");
+      const steps = p.steps.map((s, i) => `${i + 1}. ${s.label}: ${s.text}${s.url ? `\n${s.url}` : ""}`);
+      return `${p.heading}\n\n${steps.join("\n\n")}`;
+    })
+    .join("\n\n");
+}
+
+/**
+ * The same email as HTML, with real <a> links, so links are clickable in every
+ * mail app, desktop Outlook included. Plain inline styles only, so it survives
+ * being pasted into a draft or opened from an .eml file.
+ */
+export function agentEmailHtml(l: Listing, lo: LoanOfficer | null, origin: string): string {
+  const font = "font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#0a0a0a";
+  const p = (inner: string) => `<p style="margin:0 0 14px;${font}">${inner}</p>`;
+  const a = (url: string) => `<a href="${esc(url)}" style="color:#0a58ca;text-decoration:underline">${esc(url)}</a>`;
+  return agentEmailParts(l, lo, origin)
+    .map((part) => {
+      if (part.kind === "p") return p(esc(part.text));
+      if (part.kind === "link")
+        return p([part.heading ? `<strong>${esc(part.heading)}</strong>` : "", part.text ? esc(part.text) : "", a(part.url)].filter(Boolean).join("<br>"));
+      const items = part.steps
+        .map((s) => `<li style="margin:0 0 10px;${font}"><strong>${esc(s.label)}:</strong> ${esc(s.text)}${s.url ? `<br>${a(s.url)}` : ""}</li>`)
+        .join("");
+      return `${p(`<strong>${esc(part.heading)}</strong>`)}<ol style="margin:0 0 14px;padding:0 0 0 22px">${items}</ol>`;
+    })
+    .join("\n");
+}
+
+/** The agent's email address, when we have a usable one. */
+export function agentEmailAddress(l: Listing): string | null {
+  const email = l.agent.email?.trim() ?? "";
+  return EMAIL_RE.test(email) ? email : null;
+}
+
+/** Where the "On a computer?" link in the LO email goes: the kit email with clickable links. */
+export function agentEmailPagePath(slug: string): string {
+  return `/l/${slug}/email-agent`;
 }
 
 /**
@@ -73,9 +138,9 @@ export function agentEmailBody(l: Listing, lo: LoanOfficer | null, origin: strin
  * When we don't have a usable agent email, the draft opens with an empty To line.
  */
 export function agentMailto(l: Listing, lo: LoanOfficer | null, origin: string): { href: string; hasEmail: boolean } {
-  const email = l.agent.email?.trim() ?? "";
-  const hasEmail = EMAIL_RE.test(email);
-  const subject = `Your marketing kit for ${streetLine(l)}`;
+  const email = agentEmailAddress(l) ?? "";
+  const hasEmail = !!email;
+  const subject = agentEmailSubject(l);
   const body = agentEmailBody(l, lo, origin);
   // encodeURIComponent (not URLSearchParams) so spaces become %20, which every mail app reads.
   const to = hasEmail ? encodeURIComponent(email).replace(/%40/g, "@") : "";
@@ -122,6 +187,9 @@ function kitCard(l: Listing, lo: LoanOfficer, origin: string): string {
   const mailNote = mail.hasEmail
     ? `Opens an email to ${esc(l.agent.email!.trim())} in your mail app with the kit link. Just hit send.`
     : `Opens an email with the kit link in your mail app. We don't have ${esc(agentFirst ?? "the agent")}'s email address, so add it in the To line.`;
+  // The mailto: draft is plain text, and desktop Outlook leaves its links unclickable for the agent.
+  const desktopLink = `${origin}${agentEmailPagePath(l.slug)}`;
+  const desktopNote = `<br><strong style="color:#0a0a0a">On a computer?</strong> <a href="${esc(desktopLink)}" target="_blank" style="color:#0a0a0a;text-decoration:underline">Use this version</a> so the links are clickable for ${esc(agentFirst ?? "the agent")}.`;
   const facts = [formatPrice(l.price), statsLine(l)].filter(Boolean).join(" · ");
   const agent = [l.agent.name, l.agent.brokerage].filter(Boolean).join(", ");
   const photo = l.photos[0]
@@ -138,12 +206,12 @@ function kitCard(l: Listing, lo: LoanOfficer, origin: string): string {
     <p style="margin:4px 0 0;font-size:14px;color:#5b5b5b">${esc(facts)}</p>
     <p style="margin:10px 0 0;font-size:14px;color:#0a0a0a">Listed by <strong>${esc(agent)}</strong>${l.agent.phone ? ` · ${esc(l.agent.phone)}` : ""}${l.agent.email ? ` · ${esc(l.agent.email)}` : ""}</p>
     ${noPhotos}
-    ${buttonRows(button(mail.href, mailLabel, true), mailNote, [
+    ${buttonRows(button(mail.href, mailLabel, true), mailNote + desktopNote, [
       button(kitUrl, "Open kit", false),
       button(`${kitUrl}/download`, "Download all", false),
     ])}
     <p style="margin:16px 0 4px;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#5b5b5b">Or copy and text to ${esc(agentFirst ?? "the agent")}</p>
-    <p style="margin:0;padding:12px 14px;background:#f4f3f1;font-size:14px;line-height:1.5;color:#0a0a0a">${esc(agentMessage(l, kitUrl))}</p>
+    <p style="margin:0;padding:12px 14px;background:#f4f3f1;font-size:14px;line-height:1.5;color:#0a0a0a">${linkify(esc(agentMessage(l, kitUrl)))}</p>
   </td></tr>
 </table>`;
 }
