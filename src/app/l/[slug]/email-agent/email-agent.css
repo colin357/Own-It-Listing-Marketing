@@ -14,5 +14,7 @@
 @media (max-width: 720px) {
   .ea-options { grid-template-columns: 1fr; }
   .ea-option, .ea-body { padding: 18px; }
+  /* The Outlook draft file only opens in desktop Outlook. */
+  .ea-desktop { display: none; }
   .ea-head { padding: 16px 18px; }
 }

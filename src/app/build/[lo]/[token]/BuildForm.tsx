@@ -2,6 +2,8 @@
 
 import { useActionState } from "react";
 import Link from "next/link";
+import { AddressInput } from "./AddressInput";
+import { AgentFields } from "./AgentFields";
 import { buildKitAction, findListingAction, type BuildState, type FindState } from "./actions";
 
 const money = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
@@ -14,42 +16,16 @@ export function BuildForm({ slug, token, photos }: { slug: string; token: string
   return (
     <div className="build">
       <form action={find} className="build-search">
-        <input type="hidden" name="prevMls" value={state.mls ?? ""} />
-        <input type="hidden" name="prevAddress" value={state.address ?? ""} />
-        <label className="field">
-          <span className="field-label">MLS number</span>
-          <input
-            name="mls"
-            defaultValue={state.mls}
-            key={`mls-${state.mls ?? ""}`}
-            placeholder="e.g. 20845123"
-            autoComplete="off"
-            inputMode="text"
-            autoFocus
-          />
-        </label>
         <label className="field">
           <span className="field-label">Property address</span>
-          <input
-            name="address"
-            defaultValue={state.address}
-            key={`addr-${state.address ?? ""}`}
-            placeholder="123 Main St, Austin, TX 78704"
-            autoComplete="off"
-          />
-          <span className="field-hint">
-            Include the city, state and ZIP. We try the MLS # first and use the address when the listing isn&apos;t in
-            our search area yet, so filling in both saves a step.
-          </span>
+          <AddressInput key={`addr-${state.address ?? ""}`} slug={slug} token={token} defaultValue={state.address} />
+          <span className="field-hint">Pick the address from the list, or type it with the city, state and ZIP.</span>
         </label>
         <div>
           <button className="pill pill-lg" disabled={finding || building}>
             {finding ? "Looking it up…" : "Find listing"}
           </button>
         </div>
-        {state.askAddress && !state.error && !state.address ? (
-          <p className="build-note">We don&apos;t have MLS #{state.mls} yet. Add the address and search again.</p>
-        ) : null}
         {state.error ? <p className="build-note build-error">{state.error}</p> : null}
       </form>
 
@@ -64,10 +40,12 @@ export function BuildForm({ slug, token, photos }: { slug: string; token: string
             {f.baths != null ? <span>{f.baths} ba</span> : null}
             {f.sqft ? <span>{f.sqft.toLocaleString("en-US")} sq ft</span> : null}
           </p>
-          <p className="small">
-            Listed by <strong>{f.agent}</strong>
-            {f.office ? `, ${f.office}` : ""}
-          </p>
+          {f.agent ? (
+            <p className="small">
+              Listed by <strong>{f.agent}</strong>
+              {f.office ? `, ${f.office}` : ""}
+            </p>
+          ) : null}
 
           {f.existingSlug ? (
             <div className="build-actions">
@@ -79,6 +57,14 @@ export function BuildForm({ slug, token, photos }: { slug: string; token: string
           ) : (
             <form action={build} className="build-actions">
               <input type="hidden" name="key" value={f.key} />
+              {!f.agent ? (
+                <AgentFields
+                  key={f.key}
+                  newConstruction={f.newConstruction}
+                  yearBuilt={f.yearBuilt}
+                  office={f.office}
+                />
+              ) : null}
               <button className="pill" disabled={building}>
                 {building ? "Building your kit…" : "Build the kit"}
               </button>
@@ -87,7 +73,7 @@ export function BuildForm({ slug, token, photos }: { slug: string; token: string
                   {photos ? "Pulling the listing photos. This can take up to a minute." : "Almost done."}
                 </p>
               ) : (
-                <p className="small muted">Not the right home? Check the MLS number and search again.</p>
+                <p className="small muted">Not the right home? Check the address and search again.</p>
               )}
               {built.error ? <p className="build-note build-error">{built.error}</p> : null}
             </form>

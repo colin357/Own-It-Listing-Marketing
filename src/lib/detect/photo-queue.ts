@@ -9,7 +9,7 @@ import {
   matchItems,
   runFinished,
   startZillowRun,
-  addressQueryFor,
+  zillowInputsFor,
   zillowRunItems,
 } from "./providers/zillow-photos";
 import type { Detection, SourceListing } from "./types";
@@ -57,8 +57,8 @@ interface InFlight {
   runId: string;
   datasetId: string;
   slugs: string[];
-  /** Address text sent to Zillow for each slug (it varies between retries). */
-  queries?: Record<string, string>;
+  /** Address text(s) sent to Zillow for each slug (they vary between retries). */
+  queries?: Record<string, string | string[]>;
   startedAt: number;
 }
 
@@ -182,7 +182,7 @@ export async function processPhotoQueue({ deadline }: { deadline: number }): Pro
             if (!runFinished(state.status)) await abortZillowRun(token, run.runId);
             const dets = await Promise.all(run.slugs.map((s) => detections.get(s)));
             const live = dets.filter((d): d is Detection => !!d);
-            const queries = new Map(live.map((d) => [d.listing.id, run.queries?.[d.slug] ?? addressQueryFor(d.listing)]));
+            const queries = new Map(live.map((d) => [d.listing.id, run.queries?.[d.slug] ?? zillowInputsFor(d.listing)]));
             const items = await zillowRunItems(token, state.datasetId).catch(() => []);
             const found = matchItems(live.map((d) => d.listing), items, queries);
             const failed = state.status !== "SUCCEEDED";
@@ -218,9 +218,10 @@ export async function processPhotoQueue({ deadline }: { deadline: number }): Pro
         await photoQueue.add(slugs, Date.now() + LEASE_MS, true);
         try {
           if (token) {
-            // Each retry after "not found" writes the address a little differently (see addressQueries).
-            const queries = Object.fromEntries(keep.map((d) => [d.slug, addressQueryFor(d.listing, d.photoTries ?? 0)]));
-            const run = await startZillowRun(token, slugs.map((s) => queries[s]), RUN_TIMEOUT_SEC);
+            // Each retry after "not found" writes the address a little differently (see addressQueries),
+            // and every try also sends it without the city (see zipQuery).
+            const queries = Object.fromEntries(keep.map((d) => [d.slug, zillowInputsFor(d.listing, d.photoTries ?? 0)]));
+            const run = await startZillowRun(token, slugs.flatMap((s) => queries[s]), RUN_TIMEOUT_SEC);
             runs.push({ runId: run.id, datasetId: run.datasetId, slugs, queries, startedAt: Date.now() });
             await documents.set(RUNS_DOC, runs);
           } else {

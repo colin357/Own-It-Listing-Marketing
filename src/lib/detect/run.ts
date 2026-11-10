@@ -1,10 +1,12 @@
 import "server-only";
+import { isNewConstruction } from "./newConstruction";
 import { detections, documents, listings, loanOfficers } from "../store";
 import { createListing } from "../listings";
 import { formatNumber, slugify } from "../format";
-import type { Listing, LoanOfficer } from "../types";
+import type { Listing, ListingStatus, LoanOfficer } from "../types";
 import { AUTO_CONFIDENCE, buildMatcher, nameParts, type Match } from "./match";
-import { getMetros, getRoster } from "./roster";
+import { detectionInputs } from "./roster";
+import { isActive } from "../plan";
 import { listingProvider, lookupPhotos, photoSource } from "./providers";
 import { applyPhotos, processPhotoQueue, queuePhotos } from "./photo-queue";
 import type { Detection, DetectionRun, SourceListing } from "./types";
@@ -33,7 +35,7 @@ function lotSizeLabel(sqft?: number): string | undefined {
 
 function highlightsFor(l: SourceListing): string[] {
   const h: string[] = [];
-  if (l.listingType === "New Construction") h.push("New construction");
+  if (isNewConstruction(l)) h.push(l.community ? `New construction in ${l.community}` : "New construction");
   if (l.yearBuilt) h.push(`Built in ${l.yearBuilt}`);
   const lot = lotSizeLabel(l.lotSizeSqft);
   if (lot && l.lotSizeSqft! >= 10_000) h.push(`${lot} lot`);
@@ -41,11 +43,15 @@ function highlightsFor(l: SourceListing): string[] {
 }
 
 /** Creates the listing kit for a detection and records where it came from. */
-export async function createKitFromDetection(det: Detection, lo: LoanOfficer): Promise<Listing> {
+export async function createKitFromDetection(
+  det: Detection,
+  lo: LoanOfficer,
+  status: ListingStatus = "just-listed",
+): Promise<Listing> {
   const s = det.listing;
   const created = await createListing({
     loanOfficerSlug: lo.slug,
-    status: "just-listed",
+    status,
     address: s.address,
     unit: s.unit,
     city: s.city,
@@ -66,13 +72,14 @@ export async function createKitFromDetection(det: Detection, lo: LoanOfficer): P
       email: s.agent.email ?? det.rosterAgent.email,
       brokerage: s.office?.name ?? det.rosterAgent.brokerage,
       // A headshot the agent uploaded on an earlier kit beats the roster's.
-      headshotUrl: (await savedHeadshot(s.agent.name)) ?? det.rosterAgent.headshotUrl,
+      headshotUrl: s.builder ? undefined : ((await savedHeadshot(s.agent.name)) ?? det.rosterAgent.headshotUrl),
     },
     listingUrl: s.listingUrl,
   });
   const listing: Listing = {
     ...created,
     source: { provider: s.provider, id: s.id, mlsNumber: s.mlsNumber, mlsName: s.mlsName, detectedAt: det.createdAt },
+    ...(s.builder ? { builder: s.builder } : {}),
   };
   await listings.save(listing);
   return listing;
@@ -140,12 +147,10 @@ export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin
   const startedAt = new Date(startMs).toISOString();
   const provider = listingProvider();
   if (!provider) throw new Error("No listings feed configured. Set RENTCAST_API_KEY.");
-  const [roster, metros, los, known] = await Promise.all([
-    getRoster(),
-    getMetros(),
-    loanOfficers.list(),
-    detections.list(),
-  ]);
+  const [allLos, known] = await Promise.all([loanOfficers.list(), detections.list()]);
+  // Self-signup loan officers whose subscription lapsed get no new kits.
+  const los = allLos.filter(isActive);
+  const { roster, metros } = await detectionInputs(allLos);
   if (!roster.length || !metros.length) throw new Error("Upload the agent roster and metros first (Admin → Roster).");
 
   const match = buildMatcher(roster, metros);
@@ -372,6 +377,8 @@ export async function approveDetection(slug: string, origin: string, loSlug?: st
     updatedAt: new Date().toISOString(),
   };
   await detections.save(saved);
+  // Zillow didn't have photos this time: keep looking in the background.
+  if (!listing.photos.length && photoSource()) await queuePhotos([saved.slug]);
   await notify(origin, kit, lo, saved);
   return saved;
 }

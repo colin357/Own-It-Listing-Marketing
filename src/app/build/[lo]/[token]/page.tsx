@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { listings, loanOfficers } from "@/lib/store";
-import { validLoToken } from "@/lib/loLinks";
+import { accountPath, validLoToken } from "@/lib/loLinks";
+import { isActive } from "@/lib/plan";
 import { photoSource } from "@/lib/detect/providers";
 import { formatPrice, streetLine } from "@/lib/format";
 import { BuildForm } from "./BuildForm";
@@ -18,6 +19,7 @@ export default async function BuildPage({ params }: PageProps<"/build/[lo]/[toke
   if (!validLoToken(slug, token)) notFound();
   const [lo, all] = await Promise.all([loanOfficers.get(slug), listings.list()]);
   if (!lo) notFound();
+  if (!isActive(lo)) return <Inactive slug={slug} />;
   const recent = all.filter((l) => l.loanOfficerSlug === lo.slug).slice(0, 12);
 
   return (
@@ -32,7 +34,7 @@ export default async function BuildPage({ params }: PageProps<"/build/[lo]/[toke
         <p className="eyebrow">Hi {lo.name.split(/\s+/)[0]}</p>
         <h1 className="display display-md">Build a listing kit</h1>
         <p className="lead muted build-lead">
-          Enter the MLS number and address of any active listing. We pull the home details and photos and build the full kit
+          Enter the address of any active listing. We pull the home details and photos and build the full kit
           (social posts, flyers, captions and emails) co-branded with you, ready to send to the agent.
         </p>
         <BuildForm slug={slug} token={token} photos={!!photoSource()} />
@@ -56,5 +58,22 @@ export default async function BuildPage({ params }: PageProps<"/build/[lo]/[toke
         ) : null}
       </main>
     </>
+  );
+}
+
+function Inactive({ slug }: { slug: string }) {
+  const account = accountPath(slug);
+  return (
+    <main className="wrap build-main">
+      <h1 className="display display-md">Your subscription isn&apos;t active</h1>
+      <p className="lead muted build-lead">
+        Restart your Listing Kits subscription to build kits again. Kits you already made still work.
+      </p>
+      {account ? (
+        <Link className="pill pill-lg" href={account}>
+          Go to my account
+        </Link>
+      ) : null}
+    </main>
   );
 }

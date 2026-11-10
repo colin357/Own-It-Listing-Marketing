@@ -49,6 +49,11 @@ export function buildEmails(l: Listing, lo: LoanOfficer, url = l.listingUrl): Em
   const sold = l.status === "just-sold";
   const pending = l.status === "under-contract";
   const active = !sold && !pending;
+  // Kits a loan officer builds by hand are for homes that have been on the market a while,
+  // so their emails don't call the home new or just listed.
+  const featured = l.status === "featured";
+  const newBuild = l.status === "new-construction";
+  const notNew = featured || newBuild;
   const oh = formatOpenHouse(l);
   const pay = paymentInfo(l, lo);
   const programs = active ? programOptions(l, lo) : null;
@@ -61,13 +66,13 @@ export function buildEmails(l: Listing, lo: LoanOfficer, url = l.listingUrl): Em
   // 1. Friends, family and past clients.
   emails.push({
     id: "sphere",
-    label: sold ? "Just sold announcement" : "New listing announcement",
+    label: sold ? "Just sold announcement" : notNew ? "Listing announcement" : "New listing announcement",
     audience: "Friends, family and past clients",
     subject: sold
       ? `Just sold: ${street}, ${l.city}`
       : pending
         ? `Under contract: ${street}, ${l.city}`
-        : `${l.status === "coming-soon" ? "Coming soon" : l.status === "price-improved" ? "Price improved" : "Just listed"}: ${street}, ${l.city}`,
+        : `${l.status === "coming-soon" ? "Coming soon" : l.status === "price-improved" ? "Price improved" : featured ? "Featured listing" : newBuild ? "New construction" : "Just listed"}: ${street}, ${l.city}`,
     body: lines(
       "Hi [First name],",
       "",
@@ -75,7 +80,11 @@ export function buildEmails(l: Listing, lo: LoanOfficer, url = l.listingUrl): Em
         ? `I'm excited to share that ${fullAddress(l)} is officially sold! Thank you to everyone who shared it and sent people my way.`
         : pending
           ? `Quick update: ${fullAddress(l)} is under contract. If you or someone you know was hoping for something like it, I'd love to help find the next one.`
-          : `I just listed ${fullAddress(l)}, offered at ${formatPrice(l.price)}, and wanted you to be one of the first to know.`,
+          : newBuild
+            ? `I wanted to make sure you saw this new construction home at ${fullAddress(l)}, offered at ${formatPrice(l.price)}.`
+            : featured
+              ? `I wanted to make sure ${fullAddress(l)} is on your radar. It's offered at ${formatPrice(l.price)}.`
+              : `I just listed ${fullAddress(l)}, offered at ${formatPrice(l.price)}, and wanted you to be one of the first to know.`,
       "",
       factsLine(l),
       l.description && active ? `\n${l.description}` : null,
@@ -97,13 +106,21 @@ export function buildEmails(l: Listing, lo: LoanOfficer, url = l.listingUrl): Em
     id: "neighbors",
     label: sold ? "Just sold in your neighborhood" : "Neighbor letter",
     audience: "Homeowners near the listing",
-    subject: sold ? `A home near you just sold: ${street}` : `A home in your neighborhood just hit the market`,
+    subject: sold
+      ? `A home near you just sold: ${street}`
+      : newBuild
+        ? `A new home in your neighborhood is for sale`
+        : featured
+          ? `A home in your neighborhood is for sale`
+          : `A home in your neighborhood just hit the market`,
     body: lines(
       "Hi neighbor,",
       "",
       sold
         ? `I wanted to let you know that I just sold ${street} in your neighborhood. Homes nearby are getting real attention from buyers right now.`
-        : `I wanted to give you a heads up that I just listed ${street} in your neighborhood, offered at ${formatPrice(l.price)}.`,
+        : notNew
+          ? `I wanted to give you a heads up that ${street}${newBuild ? ", a new construction home," : ""} in your neighborhood is for sale, offered at ${formatPrice(l.price)}.`
+          : `I wanted to give you a heads up that I just listed ${street} in your neighborhood, offered at ${formatPrice(l.price)}.`,
       "",
       factsLine(l),
       active && oh ? `\nYou're welcome to stop by the open house: ${oh}.` : null,
@@ -124,11 +141,13 @@ export function buildEmails(l: Listing, lo: LoanOfficer, url = l.listingUrl): Em
       id: "agents",
       label: "Bring your buyers",
       audience: "Agents in your office and network",
-      subject: `New listing: ${street}, ${l.city} | ${formatPrice(l.price)}`,
+      subject: `${featured ? "Featured listing" : newBuild ? "New construction" : "New listing"}: ${street}, ${l.city} | ${formatPrice(l.price)}`,
       body: lines(
         "Hi [First name],",
         "",
-        `I have a new listing that might be right for one of your buyers: ${fullAddress(l)}.`,
+        notNew
+          ? `I have a ${newBuild ? "new construction home" : "listing"} that might be right for one of your buyers: ${fullAddress(l)}.`
+          : `I have a new listing that might be right for one of your buyers: ${fullAddress(l)}.`,
         "",
         factsLine(l),
         l.lotSize ? `Lot: ${l.lotSize}` : null,
@@ -181,7 +200,7 @@ export function buildEmails(l: Listing, lo: LoanOfficer, url = l.listingUrl): Em
             body: lines(
               "Hi [First name],",
               "",
-              `A home just came on the market that made me think of you: ${fullAddress(l)}, offered at ${formatPrice(l.price)}.`,
+              `${notNew ? `A ${newBuild ? "new construction home" : "home"} I'm working on` : "A home just came on the market that"} made me think of you: ${fullAddress(l)}, offered at ${formatPrice(l.price)}.`,
               "",
               factsLine(l),
               highlightList(l, 4) ? `\n${highlightList(l, 4)}` : null,

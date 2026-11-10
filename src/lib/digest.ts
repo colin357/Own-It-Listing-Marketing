@@ -1,8 +1,8 @@
 import "server-only";
+import { isActive } from "./plan";
 import { detections, listings, loanOfficers } from "./store";
 import { firstName, formatPrice, statsLine, streetLine } from "./format";
-import { programOptions } from "./mortgage";
-import { buyerPagePath } from "./site";
+import { agentEmailAddress, agentEmailPagePath, groupByAgent } from "./agentEmail";
 import { mailConfigured, sendMail, type Mail } from "./mail";
 import type { Detection } from "./detect/types";
 import { sameHome } from "./detect/dedupe";
@@ -36,118 +36,6 @@ function agentMessage(l: Listing, kitUrl: string): string {
   return `Hi${who ? ` ${who}` : ""}, congrats on ${streetLine(l)}! I put together a free marketing kit for it: social posts, flyers, captions and emails, all ready to download. ${kitUrl}`;
 }
 
-const EMAIL_RE = /^[^\s@,;<>"]+@[^\s@,;<>"]+\.[^\s@,;<>"]+$/;
-
-/** One part of the kit email to the listing agent, shared by the plain-text and HTML versions. */
-type EmailPart =
-  | { kind: "p"; text: string }
-  | { kind: "link"; heading?: string; text?: string; url: string }
-  | { kind: "steps"; heading: string; steps: { label: string; text: string; url?: string }[] };
-
-/** What the kit email to the listing agent says, before it's laid out as text or HTML. */
-function agentEmailParts(l: Listing, lo: LoanOfficer | null, origin: string): EmailPart[] {
-  const kitUrl = `${origin}/l/${l.slug}`;
-  const who = firstName(l.agent.name);
-  const forSale = l.status !== "just-sold" && l.status !== "under-contract";
-  // The seller credit section only shows on kits that show payments.
-  const sellerCredit = forSale && !!lo && !!programOptions({ ...l, concession: undefined }, lo);
-  const steps: { label: string; text: string; url?: string }[] = [
-    { label: "Social posts", text: "Save a post or story and share it on Instagram, Facebook or LinkedIn. Captions are written for you, just tap Copy." },
-    { label: "Flyers", text: "Print the flyer for showings and open houses. The QR code takes buyers to the home's page." },
-    {
-      label: "Buyer page",
-      text: `Text or post this link. Buyers see photos, details${lo?.showPayments === false ? "" : " and payments"}, and can call you for a tour in one tap:`,
-      url: `${origin}${buyerPagePath(l.slug)}`,
-    },
-    ...(sellerCredit
-      ? [{ label: "Seller credit", text: "If your seller will help with buyer costs, pick an option and every graphic and flyer updates to show the lower payment." }]
-      : []),
-    { label: "Emails", text: "Ready-to-send emails for your sphere and buyers are at the bottom of the kit." },
-  ];
-  return [
-    { kind: "p", text: `Hi${who ? ` ${who}` : ""},` },
-    { kind: "p", text: `Congrats on your new listing at ${streetLine(l)}! I put together a free marketing kit for it, made for this home and ready to post, print or send.` },
-    { kind: "link", heading: "YOUR KIT", url: kitUrl },
-    ...(l.photos.length
-      ? []
-      : [{ kind: "p" as const, text: "We couldn't find your listing photos yet. Add them at the top of the kit and every graphic updates." }]),
-    { kind: "steps", heading: "HOW TO USE IT", steps },
-    { kind: "link", text: "Download everything at once:", url: `${kitUrl}/download` },
-    { kind: "p", text: "Let me know if you'd like anything changed. And send any buyers with financing questions my way!" },
-  ];
-}
-
-export function agentEmailSubject(l: Listing): string {
-  return `Your marketing kit for ${streetLine(l)}`;
-}
-
-/**
- * Plain-text body of the kit email to the listing agent, for the mailto: draft
- * (which can't carry HTML). Short CAPS headings, numbered steps and links on
- * their own lines. Phone mail apps turn bare links into tappable ones, but
- * desktop Outlook doesn't, so desktop senders get the HTML version
- * (agentEmailHtml) from the "On a computer?" page instead.
- */
-export function agentEmailBody(l: Listing, lo: LoanOfficer | null, origin: string): string {
-  return agentEmailParts(l, lo, origin)
-    .map((p) => {
-      if (p.kind === "p") return p.text;
-      if (p.kind === "link") return [p.heading, p.text, p.url].filter(Boolean).join("\n");
-      const steps = p.steps.map((s, i) => `${i + 1}. ${s.label}: ${s.text}${s.url ? `\n${s.url}` : ""}`);
-      return `${p.heading}\n\n${steps.join("\n\n")}`;
-    })
-    .join("\n\n");
-}
-
-/**
- * The same email as HTML, with real <a> links, so links are clickable in every
- * mail app, desktop Outlook included. Plain inline styles only, so it survives
- * being pasted into a draft or opened from an .eml file.
- */
-export function agentEmailHtml(l: Listing, lo: LoanOfficer | null, origin: string): string {
-  const font = "font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#0a0a0a";
-  const p = (inner: string) => `<p style="margin:0 0 14px;${font}">${inner}</p>`;
-  const a = (url: string) => `<a href="${esc(url)}" style="color:#0a58ca;text-decoration:underline">${esc(url)}</a>`;
-  return agentEmailParts(l, lo, origin)
-    .map((part) => {
-      if (part.kind === "p") return p(esc(part.text));
-      if (part.kind === "link")
-        return p([part.heading ? `<strong>${esc(part.heading)}</strong>` : "", part.text ? esc(part.text) : "", a(part.url)].filter(Boolean).join("<br>"));
-      const items = part.steps
-        .map((s) => `<li style="margin:0 0 10px;${font}"><strong>${esc(s.label)}:</strong> ${esc(s.text)}${s.url ? `<br>${a(s.url)}` : ""}</li>`)
-        .join("");
-      return `${p(`<strong>${esc(part.heading)}</strong>`)}<ol style="margin:0 0 14px;padding:0 0 0 22px">${items}</ol>`;
-    })
-    .join("\n");
-}
-
-/** The agent's email address, when we have a usable one. */
-export function agentEmailAddress(l: Listing): string | null {
-  const email = l.agent.email?.trim() ?? "";
-  return EMAIL_RE.test(email) ? email : null;
-}
-
-/** Where the "On a computer?" link in the LO email goes: the kit email with clickable links. */
-export function agentEmailPagePath(slug: string): string {
-  return `/l/${slug}/email-agent`;
-}
-
-/**
- * A mailto: link that opens a ready-to-send email to the listing agent in the
- * loan officer's own mail app, so the agent sees it come from the loan officer.
- * When we don't have a usable agent email, the draft opens with an empty To line.
- */
-export function agentMailto(l: Listing, lo: LoanOfficer | null, origin: string): { href: string; hasEmail: boolean } {
-  const email = agentEmailAddress(l) ?? "";
-  const hasEmail = !!email;
-  const subject = agentEmailSubject(l);
-  const body = agentEmailBody(l, lo, origin);
-  // encodeURIComponent (not URLSearchParams) so spaces become %20, which every mail app reads.
-  const to = hasEmail ? encodeURIComponent(email).replace(/%40/g, "@") : "";
-  const href = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body.replace(/\n/g, "\r\n"))}`;
-  return { href, hasEmail };
-}
-
 /**
  * "Bulletproof" button: a plain table cell carries the colour and border, and
  * the link inside carries the padding. No inline-block div wrappers or conditional
@@ -160,7 +48,7 @@ function button(href: string, label: string, primary: boolean): string {
   const target = href.startsWith("mailto:") ? "" : ' target="_blank"';
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate"><tr>
       <td align="center" bgcolor="${bg}" style="background-color:${bg};border:2px solid #0a0a0a;border-radius:6px;mso-padding-alt:11px 20px">
-        <a href="${esc(href)}"${target} style="display:inline-block;padding:11px 20px;color:${fg};font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:18px;font-weight:700;text-decoration:none">${label}</a>
+        <a href="${esc(href)}"${target} style="display:inline-block;padding:11px 20px;color:${fg};font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:18px;font-weight:700;text-decoration:none;white-space:nowrap">${label}</a>
       </td></tr></table>`;
 }
 
@@ -179,17 +67,24 @@ function buttonRows(primary: string, note: string, secondary: string[]): string 
     </table>`;
 }
 
+/**
+ * Under each "Email kit" button. The button opens the kit email with real
+ * links (a plain mailto: draft leaves links clickable on some devices and not
+ * others), ready to send from the loan officer's own mail app.
+ */
+function emailNote(email: string | null, agentFirst: string | null | undefined, what: string): string {
+  const who = esc(agentFirst ?? "the agent");
+  return `Opens your email to ${email ? esc(email) : who} with ${what}. Copy it into a new email, or open it as an Outlook draft, and hit send. The links stay clickable on any device.${
+    email ? "" : ` We don't have ${who}'s email address, so add it in the To line.`
+  }`;
+}
+
 function kitCard(l: Listing, lo: LoanOfficer, origin: string): string {
   const kitUrl = `${origin}/l/${l.slug}`;
   const agentFirst = firstName(l.agent.name);
-  const mail = agentMailto(l, lo, origin);
+  const email = agentEmailAddress(l);
   const mailLabel = `Email kit to ${esc(agentFirst ?? "the agent")}`;
-  const mailNote = mail.hasEmail
-    ? `Opens an email to ${esc(l.agent.email!.trim())} in your mail app with the kit link. Just hit send.`
-    : `Opens an email with the kit link in your mail app. We don't have ${esc(agentFirst ?? "the agent")}'s email address, so add it in the To line.`;
-  // The mailto: draft is plain text, and desktop Outlook leaves its links unclickable for the agent.
-  const desktopLink = `${origin}${agentEmailPagePath(l.slug)}`;
-  const desktopNote = `<br><strong style="color:#0a0a0a">On a computer?</strong> <a href="${esc(desktopLink)}" target="_blank" style="color:#0a0a0a;text-decoration:underline">Use this version</a> so the links are clickable for ${esc(agentFirst ?? "the agent")}.`;
+  const mailNote = emailNote(email, agentFirst, "the kit link");
   const facts = [formatPrice(l.price), statsLine(l)].filter(Boolean).join(" · ");
   const agent = [l.agent.name, l.agent.brokerage].filter(Boolean).join(", ");
   const photo = l.photos[0]
@@ -206,13 +101,71 @@ function kitCard(l: Listing, lo: LoanOfficer, origin: string): string {
     <p style="margin:4px 0 0;font-size:14px;color:#5b5b5b">${esc(facts)}</p>
     <p style="margin:10px 0 0;font-size:14px;color:#0a0a0a">Listed by <strong>${esc(agent)}</strong>${l.agent.phone ? ` · ${esc(l.agent.phone)}` : ""}${l.agent.email ? ` · ${esc(l.agent.email)}` : ""}</p>
     ${noPhotos}
-    ${buttonRows(button(mail.href, mailLabel, true), mailNote + desktopNote, [
+    ${buttonRows(button(`${origin}${agentEmailPagePath(l)}`, mailLabel, true), mailNote, [
       button(kitUrl, "Open kit", false),
       button(`${kitUrl}/download`, "Download all", false),
     ])}
     <p style="margin:16px 0 4px;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#5b5b5b">Or copy and text to ${esc(agentFirst ?? "the agent")}</p>
     <p style="margin:0;padding:12px 14px;background:#f4f3f1;font-size:14px;line-height:1.5;color:#0a0a0a">${linkify(esc(agentMessage(l, kitUrl)))}</p>
   </td></tr>
+</table>`;
+}
+
+function groupAgentMessage(ls: Listing[], origin: string): string {
+  const who = firstName(ls[0].agent.name);
+  return `Hi${who ? ` ${who}` : ""}, congrats on your new listings! I put together a free marketing kit for each one: social posts, flyers, captions and emails, all ready to download.\n${ls
+    .map((l) => `${streetLine(l)}: ${origin}/l/${l.slug}`)
+    .join("\n")}`;
+}
+
+/** A listing inside an agent's group: photo, details and kit links, with no email button of its own. */
+function groupKitRow(l: Listing, origin: string, last: boolean): string {
+  const kitUrl = `${origin}/l/${l.slug}`;
+  const facts = [formatPrice(l.price), statsLine(l)].filter(Boolean).join(" · ");
+  const photo = l.photos[0]
+    ? `<img src="${esc(l.photos[0])}" width="496" alt="" style="display:block;width:100%;max-width:496px;height:auto;border:0" />`
+    : "";
+  return `<tr><td style="padding:0 20px ${last ? 20 : 18}px">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e4e3e0">
+      <tr><td>${photo}</td></tr>
+      <tr><td style="padding:14px 16px">
+        <p style="margin:0;font-size:17px;font-weight:700;color:#0a0a0a">${esc(streetLine(l))}, ${esc(l.city)}</p>
+        <p style="margin:4px 0 12px;font-size:14px;color:#5b5b5b">${esc(facts)}</p>
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+          <td valign="top" style="padding:0 8px 0 0">${button(kitUrl, "Open kit", false)}</td>
+          <td valign="top">${button(`${kitUrl}/download`, "Download all", false)}</td>
+        </tr></table>
+      </td></tr>
+    </table>
+  </td></tr>`;
+}
+
+/**
+ * An agent with two or more listings in this email: one card with one
+ * "Email all kits" button whose draft has every kit, then each home below it.
+ */
+function agentGroupCard(ls: Listing[], lo: LoanOfficer, origin: string): string {
+  const a = ls[0].agent;
+  const agentFirst = firstName(a.name);
+  const name = esc(agentFirst ?? "the agent");
+  const email = agentEmailAddress(ls);
+  const count = ls.length === 2 ? "both kits" : `all ${ls.length} kits`;
+  const mailNote = emailNote(email, agentFirst, `links to ${count}`);
+  const agent = [a.name, a.brokerage].filter(Boolean).join(", ");
+  return `
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e4e3e0;margin:0 0 20px">
+  <tr><td style="padding:18px 20px 16px">
+    <p style="margin:0;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#5b5b5b">${ls.length} new listings</p>
+    <p style="margin:4px 0 0;font-size:18px;font-weight:700;color:#0a0a0a">${esc(agent)}</p>
+    ${a.phone || email ? `<p style="margin:4px 0 0;font-size:14px;color:#5b5b5b">${[a.phone, email].filter(Boolean).map((x) => esc(x!)).join(" · ")}</p>` : ""}
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:14px 0 0">
+      <tr><td style="padding:0 0 6px">${button(`${origin}${agentEmailPagePath(ls)}`, `Email ${count} to ${name}`, true)}</td></tr>
+      <tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.4;color:#5b5b5b">${mailNote}</td></tr>
+    </table>
+    <p style="margin:16px 0 4px;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#5b5b5b">Or copy and text to ${name}</p>
+    <p style="margin:0;padding:12px 14px;background:#f4f3f1;font-size:14px;line-height:1.5;color:#0a0a0a">${linkify(esc(groupAgentMessage(ls, origin))).replace(/\n/g, "<br>")}</p>
+  </td></tr>
+  ${ls.map((l, i) => groupKitRow(l, origin, i === ls.length - 1)).join("")}
 </table>`;
 }
 
@@ -235,9 +188,11 @@ export function renderDigest(lo: LoanOfficer, kits: Listing[], origin: string): 
     ${emailLogo()}
     <p style="margin:12px 0 0;text-align:center;font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#5b5b5b">Listing kits</p>
     <h1 style="margin:10px 0 0;font-size:26px;line-height:1.15;color:#0a0a0a">${n === 1 ? "A new listing kit is ready" : `${n} new listing kits are ready`}</h1>
-    <p style="margin:12px 0 0;font-size:15px;line-height:1.55;color:#0a0a0a">Hi ${esc(firstName(lo.name) ?? lo.name)}, ${n === 1 ? "one of your agents just listed a home" : `${n} of your agents' new listings came in`}. Each kit has social posts, flyers, captions and emails, ready to go. Tap <strong>Email kit</strong> under a listing to send it to the agent from your own email, or copy the message to text it.</p>
+    <p style="margin:12px 0 0;font-size:15px;line-height:1.55;color:#0a0a0a">Hi ${esc(firstName(lo.name) ?? lo.name)}, ${n === 1 ? "one of your agents just listed a home" : `${n} of your agents' new listings came in`}. Each kit has social posts, flyers, captions and emails, ready to go. Tap <strong>Email kit</strong> to send it to the agent from your own email, or copy the message to text it.${groupByAgent(kits).some((g) => g.length > 1) ? " An agent with more than one new listing has their homes together, and one email sends them all." : ""}</p>
   </td></tr>
-  <tr><td style="padding:20px 32px 8px">${kits.map((l) => kitCard(l, lo, origin)).join("")}</td></tr>
+  <tr><td style="padding:20px 32px 8px">${groupByAgent(kits)
+    .map((g) => (g.length > 1 ? agentGroupCard(g, lo, origin) : kitCard(g[0], lo, origin)))
+    .join("")}</td></tr>
   <tr><td style="padding:0 32px 28px">
     <p style="margin:0;font-size:12px;line-height:1.5;color:#5b5b5b">Payment estimates on the kits use the rates and disclosures set up for you. Reply to this email with any changes.</p>
   </td></tr>
@@ -285,7 +240,8 @@ export async function pendingDigests(
   const noPhotos: WaitingKit[] = [];
   for (const [slug, pending] of byLo) {
     const lo = los.find((x) => x.slug === slug);
-    if (!lo) continue;
+    // A self-signup loan officer whose subscription lapsed isn't emailed.
+    if (!lo || !isActive(lo)) continue;
     // Homes this loan officer was already emailed.
     const sent = all.filter((d) => d.emailedAt && !d.duplicateOf && d.loanOfficerSlug === slug);
     // Within this batch, keep the kit that has photos (then the older one).
@@ -310,7 +266,9 @@ export async function pendingDigests(
       skipped.push(`${lo.name} has no email address, so ${kits.length} kit(s) weren't emailed.`);
       continue;
     }
-    kits.sort((a, b) => a.listing.address.localeCompare(b.listing.address));
+    // Same order as the email: by agent, then address.
+    const order = groupByAgent(kits.map((k) => k.listing)).flat();
+    kits.sort((a, b) => order.indexOf(a.listing) - order.indexOf(b.listing));
     digests.push({ lo, kits, ...renderDigest(lo, kits.map((k) => k.listing), origin) });
   }
   digests.sort((a, b) => a.lo.name.localeCompare(b.lo.name));

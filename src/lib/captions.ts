@@ -19,6 +19,8 @@ export interface Caption {
 const HEADLINES: Record<Listing["status"], string> = {
   "coming-soon": "🔜 COMING SOON",
   "just-listed": "🏡 JUST LISTED",
+  featured: "🏡 FEATURED LISTING",
+  "new-construction": "🏗️ NEW CONSTRUCTION",
   "open-house": "🚪 OPEN HOUSE",
   "price-improved": "📉 PRICE IMPROVED",
   "under-contract": "✍️ UNDER CONTRACT",
@@ -28,6 +30,8 @@ const HEADLINES: Record<Listing["status"], string> = {
 const STATUS_TAGS: Record<Listing["status"], string> = {
   "coming-soon": "#ComingSoon",
   "just-listed": "#JustListed",
+  featured: "#FeaturedListing",
+  "new-construction": "#NewConstruction",
   "open-house": "#OpenHouse",
   "price-improved": "#PriceImprovement",
   "under-contract": "#UnderContract",
@@ -42,7 +46,8 @@ function hashtags(l: Listing): string {
     STATUS_TAGS[l.status],
     "#HomeForSale",
     "#RealEstate",
-    "#NewListing",
+    // Hand-built kits are for homes that have been on the market a while.
+    l.status === "featured" || l.status === "new-construction" ? "#HouseHunting" : "#NewListing",
     "#Homebuying",
     "#DreamHome",
   ];

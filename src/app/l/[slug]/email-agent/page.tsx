@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getKit } from "@/lib/listings";
 import { firstName, streetLine } from "@/lib/format";
 import { siteUrl } from "@/lib/site";
-import { agentEmailAddress, agentEmailBody, agentEmailHtml, agentEmailSubject } from "@/lib/digest";
+import { agentEmailAddress, agentEmailBody, agentEmailHtml, agentEmailSubject, agentEmailPagePath, mailtoHref } from "@/lib/agentEmail";
+import { loadEmailKits } from "./load";
 import { CopyRichButton } from "@/components/CopyRichButton";
 import { CopyButton } from "@/components/CopyButton";
 import "./email-agent.css";
@@ -17,18 +17,21 @@ export const dynamic = "force-dynamic";
  * clickable for the agent. This page gives the same email with real links, as
  * an Outlook draft file or as formatted text to paste into any mail app.
  */
-export default async function EmailAgentPage({ params }: PageProps<"/l/[slug]/email-agent">) {
+export default async function EmailAgentPage({ params, searchParams }: PageProps<"/l/[slug]/email-agent">) {
   const { slug } = await params;
-  const kit = await getKit(slug);
-  if (!kit) notFound();
-  const { listing: l, lo } = kit;
+  const kits = await loadEmailKits(slug, (await searchParams).with);
+  if (!kits) notFound();
+  const { listings: ls, lo } = kits;
+  const l = ls[0];
   const origin = await siteUrl();
-  const to = agentEmailAddress(l);
-  const subject = agentEmailSubject(l);
-  const html = agentEmailHtml(l, lo, origin);
-  const text = agentEmailBody(l, lo, origin);
+  const to = agentEmailAddress(ls);
+  const subject = agentEmailSubject(ls);
+  const html = agentEmailHtml(ls, lo, origin);
+  const text = agentEmailBody(ls, lo, origin);
   const agent = firstName(l.agent.name) ?? "the agent";
-  const newEmail = `mailto:${to ? encodeURIComponent(to).replace(/%40/g, "@") : ""}?subject=${encodeURIComponent(subject)}`;
+  // An empty draft with To and Subject filled in, to paste the copied email into.
+  const newEmail = mailtoHref(to, subject);
+  const draftHref = agentEmailPagePath(ls).replace("/email-agent", "/email-agent/draft");
 
   return (
     <>
@@ -39,24 +42,16 @@ export default async function EmailAgentPage({ params }: PageProps<"/l/[slug]/em
         </div>
       </header>
       <main className="wrap ea-main">
-        <p className="eyebrow">{streetLine(l)}, {l.city}</p>
-        <h1 className="display display-md">Email the kit to {agent}</h1>
+        <p className="eyebrow">{ls.length === 1 ? `${streetLine(l)}, ${l.city}` : ls.map(streetLine).join(" · ")}</p>
+        <h1 className="display display-md">Email {ls.length === 1 ? "the kit" : `${ls.length === 2 ? "both" : `all ${ls.length}`} kits`} to {agent}</h1>
         <p className="lead muted ea-lead">
-          This version keeps the links clickable when {agent} opens it on a computer. Pick the way that matches your
-          mail app.
+          Send it from your own email. Every link in it is a real link, so it&apos;s clickable wherever {agent} opens
+          it: phone, computer, any mail app.
         </p>
 
         <section className="ea-options">
           <div className="ea-option">
-            <h2 className="label">Outlook on Windows</h2>
-            <a className="pill pill-lg" href={`/l/${l.slug}/email-agent/draft`}>Open as Outlook draft</a>
-            <p className="small muted">
-              Downloads the email. Open the file and it shows up as a new email in Outlook{to ? `, addressed to ${agent}` : ""}.
-              Then hit Send.
-            </p>
-          </div>
-          <div className="ea-option">
-            <h2 className="label">Gmail, Outlook on the web, Mac or any other app</h2>
+            <h2 className="label">Phone, Gmail, Outlook on the web, Mac or any other app</h2>
             <ol className="ea-steps">
               <li>
                 <CopyRichButton html={html} text={text} className="pill pill-lg" />
@@ -66,6 +61,14 @@ export default async function EmailAgentPage({ params }: PageProps<"/l/[slug]/em
               </li>
               <li className="small muted">Paste into the body and hit Send.</li>
             </ol>
+          </div>
+          <div className="ea-option ea-desktop">
+            <h2 className="label">Outlook on Windows</h2>
+            <a className="pill pill-lg" href={draftHref}>Open as Outlook draft</a>
+            <p className="small muted">
+              Downloads the email. Open the file and it shows up as a new email in Outlook{to ? `, addressed to ${agent}` : ""}.
+              Then hit Send.
+            </p>
           </div>
         </section>
 

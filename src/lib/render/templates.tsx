@@ -369,7 +369,7 @@ export function StoryPost(d: RenderData) {
   return (
     <div style={{ display: "flex", flexDirection: "column", width: "100%", height: "100%", background: "#fff" }}>
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: 84, background: d.accent }}>
-        <div style={{ display: "flex", ...label(24, d.onAccent) }}>{`New in ${l.city}, ${l.state}`}</div>
+        <div style={{ display: "flex", ...label(24, d.onAccent) }}>{`${l.status === "featured" || l.status === "new-construction" ? "For sale" : "New"} in ${l.city}, ${l.state}`}</div>
       </div>
       <div style={{ display: "flex", position: "relative", height: 960 }}>
         <Photo src={d.photos[0]} style={{ ...fill, width: "100%", height: "100%" }} />

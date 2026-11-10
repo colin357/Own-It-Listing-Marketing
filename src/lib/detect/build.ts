@@ -3,10 +3,12 @@ import { detections, listings } from "../store";
 import { slugify } from "../format";
 import type { Listing, LoanOfficer } from "../types";
 import { buildMatcher, nameParts } from "./match";
-import { getMetros, getRoster } from "./roster";
+import { detectionInputs } from "./roster";
 import { lookupPhotos, photoSource } from "./providers";
 import { createKitFromDetection } from "./run";
 import { normalizeMls } from "./mls";
+import { queuePhotos } from "./photo-queue";
+import { isNewConstruction } from "./newConstruction";
 import type { Detection, RosterAgent, SourceListing } from "./types";
 
 /**
@@ -41,9 +43,11 @@ export async function buildKitForLo(lo: LoanOfficer, source: SourceListing): Pro
   if (existing) return existing;
 
   let listing = source;
+  let photoNote: string | undefined;
   if (!listing.photos.length && photoSource()) {
     try {
       const p = (await lookupPhotos([listing])).get(listing.id);
+      photoNote = p?.photos.length ? undefined : (p?.note ?? "Zillow returned nothing for this address");
       if (p)
         listing = {
           ...listing,
@@ -52,13 +56,15 @@ export async function buildKitForLo(lo: LoanOfficer, source: SourceListing): Pro
           ...(p.listingUrl ? { listingUrl: p.listingUrl } : {}),
         };
     } catch (err) {
-      // The kit still works without photos; the agent can add them on the kit page.
+      // The kit still works without photos; the agent can add them on the kit page,
+      // and the photo queue keeps looking (below).
       console.error("Photo lookup failed", err);
+      photoNote = "The Zillow lookup didn't finish; retrying";
     }
   }
 
   // The roster may know the agent's headshot, phone or email.
-  const [roster, metros] = await Promise.all([getRoster(), getMetros()]);
+  const { roster, metros } = await detectionInputs();
   const match = roster.length ? buildMatcher(roster, metros)(listing) : null;
   const ownAgent = match && samePerson(match.agent.loanOfficer, lo.name) ? match.agent : null;
   const rosterAgent: RosterAgent = ownAgent ?? {
@@ -72,7 +78,7 @@ export async function buildKitForLo(lo: LoanOfficer, source: SourceListing): Pro
     slug: slugify(`${listing.provider}-${listing.id}`),
     status: "created",
     confidence: 1,
-    reason: `Built by ${lo.name} from MLS #${listing.mlsNumber ?? "unknown"}`,
+    reason: `Built by ${lo.name} from ${listing.mlsNumber ? `MLS #${listing.mlsNumber}` : listing.address}`,
     rosterAgent,
     loanOfficerName: lo.name,
     loanOfficerSlug: lo.slug,
@@ -82,15 +88,27 @@ export async function buildKitForLo(lo: LoanOfficer, source: SourceListing): Pro
     createdAt: now,
     updatedAt: now,
   };
-  const kit = await createKitFromDetection(det, lo);
+  // A loan officer builds a kit by hand when the home has been on the market a while,
+  // so it isn't "Just Listed". Detected kits from the automatic runs keep "Just Listed".
+  const kit = await createKitFromDetection(det, lo, listing.builder || isNewConstruction(listing) ? "new-construction" : "featured");
 
   // Mark the listing handled for detection, unless it belongs to another loan officer's agent
   // (they should still get their own kit) or someone already decided on it.
   const prior = await detections.get(det.slug);
   const otherLo = match && !ownAgent && !prior;
   const priorOpen = prior && prior.status !== "created" && prior.status !== "dismissed" && samePerson(prior.loanOfficerName, lo.name);
-  if ((!prior && !otherLo) || priorOpen)
-    await detections.save({ ...(prior ?? det), ...det, createdAt: prior?.createdAt ?? now, listingSlug: kit.slug });
+  if ((!prior && !otherLo) || priorOpen) {
+    await detections.save({
+      ...(prior ?? det),
+      ...det,
+      createdAt: prior?.createdAt ?? now,
+      listingSlug: kit.slug,
+      // The first lookup counts as a try, so the next one writes the address differently.
+      ...(photoNote ? { photoNote, photoTries: 1, photoCheckedAt: now } : {}),
+    });
+    // No photos yet: keep looking in the background, the same way detected kits do.
+    if (!listing.photos.length && photoSource()) await queuePhotos([det.slug]);
+  }
 
   return kit;
 }

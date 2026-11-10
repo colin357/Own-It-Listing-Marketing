@@ -1,6 +1,6 @@
 import "server-only";
 import { mlsIndex } from "../store";
-import { rentcastByAddress } from "./providers/rentcast";
+import { rentcastActiveInZip, rentcastByAddress } from "./providers/rentcast";
 import type { SourceListing } from "./types";
 
 /** "mls# 12-3456 " → "123456"; MLS numbers are compared without spaces, dashes or prefixes. */
@@ -50,6 +50,18 @@ export async function findByAddress(address: string): Promise<SourceListing[]> {
   const key = process.env.RENTCAST_API_KEY;
   if (!key) throw new Error("Address lookup needs RENTCAST_API_KEY.");
   const found = await rentcastByAddress(key, address);
+  await indexListings(found);
+  return found;
+}
+
+/**
+ * Every active listing in a ZIP (one RentCast request), all indexed so later
+ * MLS # lookups in that ZIP are free. Used when the address search misses.
+ */
+export async function findInZip(zip: string): Promise<SourceListing[]> {
+  const key = process.env.RENTCAST_API_KEY;
+  if (!key) throw new Error("Address lookup needs RENTCAST_API_KEY.");
+  const found = await rentcastActiveInZip(key, zip);
   await indexListings(found);
   return found;
 }

@@ -1,6 +1,9 @@
 export const LISTING_STATUSES = {
   "coming-soon": "Coming Soon",
   "just-listed": "Just Listed",
+  // Kits a loan officer builds by hand are for homes that have been on the market a while.
+  featured: "Featured Listing",
+  "new-construction": "New Construction",
   "open-house": "Open House",
   "price-improved": "Price Improved",
   "under-contract": "Under Contract",
@@ -54,6 +57,8 @@ export interface LoanOfficer {
   showPayments?: boolean;
   /** When set, materials show an estimated monthly payment. */
   payment?: PaymentSettings;
+  /** Set on loan officers who signed up and pay through Stripe. Absent for clients Own It manages. */
+  billing?: Billing;
   createdAt: string;
   updatedAt: string;
 }
@@ -140,6 +145,21 @@ export interface Listing {
   showPayment: boolean;
   /** Set on listings created by new-listing detection. */
   source?: ListingSource;
+  /** Builder credited in place of a listing agent (new construction). No agent headshot then. */
+  builder?: string;
   createdAt: string;
+  updatedAt: string;
+}
+
+/** A self-signup loan officer's Stripe subscription, kept in sync by the Stripe webhook. */
+export interface Billing {
+  customerId: string;
+  subscriptionId?: string;
+  /** Stripe subscription status: trialing, active, past_due, canceled, unpaid, incomplete… */
+  status: string;
+  trialEnd?: string;
+  currentPeriodEnd?: string;
+  cancelAtPeriodEnd?: boolean;
+  signedUpAt: string;
   updatedAt: string;
 }

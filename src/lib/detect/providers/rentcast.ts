@@ -48,8 +48,13 @@ interface RentcastListing {
 /** Land and rentals-style records aren't useful for listing kits. */
 const SKIP_TYPES = new Set(["Land", "Apartment"]);
 
-export function fromRentcast(r: RentcastListing): SourceListing | null {
-  if (!r.listingAgent?.name || !r.addressLine1 || !r.price) return null;
+/**
+ * `needAgent: false` keeps listings RentCast has no agent for (often
+ * new-construction homes listed by a builder). Detection needs the agent to
+ * match the roster, but an LO building a kit by hand can type the agent in.
+ */
+export function fromRentcast(r: RentcastListing, { needAgent = true } = {}): SourceListing | null {
+  if ((needAgent && !r.listingAgent?.name) || !r.addressLine1 || !r.price) return null;
   if (r.propertyType && SKIP_TYPES.has(r.propertyType)) return null;
   return {
     provider: "rentcast",
@@ -74,7 +79,7 @@ export function fromRentcast(r: RentcastListing): SourceListing | null {
     mlsName: r.mlsName,
     listedDate: r.listedDate,
     photos: [],
-    agent: { name: r.listingAgent.name, ...pickContact(r.listingAgent) },
+    agent: { name: r.listingAgent?.name ?? "", ...pickContact(r.listingAgent ?? {}) },
     office: r.listingOffice?.name ? { name: r.listingOffice.name, ...pickContact(r.listingOffice) } : undefined,
   };
 }
@@ -145,6 +150,24 @@ export function rentcastProvider(apiKey: string): ListingProvider {
  */
 export class UnreadableAddressError extends Error {}
 
+/**
+ * Every active sale listing in one ZIP, however long ago it was listed (one
+ * request, up to 500 listings). The fallback when the address search misses:
+ * RentCast's address search needs its own spelling of the address, and new
+ * streets or new-construction homes often aren't matched by it, but the
+ * listing is still in the ZIP's feed.
+ */
+export async function rentcastActiveInZip(apiKey: string, zip: string): Promise<SourceListing[]> {
+  const params = new URLSearchParams({ zipCode: zip, status: "Active", limit: String(PAGE) });
+  const res = await fetchWithRetry(`${BASE}?${params}`, apiKey);
+  if (res.status === 404) return [];
+  if (!res.ok) throw new Error(`RentCast ${res.status} for ZIP ${zip}: ${(await res.text()).slice(0, 200)}`);
+  const rows = (await res.json()) as RentcastListing[];
+  const kept = rows.map((r) => fromRentcast(r, { needAgent: false })).filter((l): l is SourceListing => !!l);
+  console.info(`RentCast ZIP ${zip}: ${rows.length} active listings, ${kept.length} usable`);
+  return kept;
+}
+
 export async function rentcastByAddress(apiKey: string, address: string): Promise<SourceListing[]> {
   const params = new URLSearchParams({ address, limit: "5" });
   const res = await fetch(`${BASE}?${params}`, {
@@ -152,13 +175,20 @@ export async function rentcastByAddress(apiKey: string, address: string): Promis
     cache: "no-store",
   });
   // RentCast answers 404 when nothing is listed at the address.
-  if (res.status === 404) return [];
+  if (res.status === 404) {
+    console.info(`RentCast address "${address}": no listing (404)`);
+    return [];
+  }
   // 400 means RentCast couldn't parse or place the address (e.g. no city or ZIP).
   if (res.status === 400) throw new UnreadableAddressError(await res.text());
   if (!res.ok) throw new Error(`RentCast ${res.status}: ${(await res.text()).slice(0, 200)}`);
   const rows = (await res.json()) as RentcastListing[];
+  console.info(
+    `RentCast address "${address}": ${rows.length} result(s)`,
+    rows.map((r) => `${r.addressLine1} ${r.zipCode} ${r.status} mls=${r.mlsNumber ?? "-"} agent=${r.listingAgent?.name ? "yes" : "no"} type=${r.listingType ?? "-"} built=${r.yearBuilt ?? "-"}`),
+  );
   return rows
     .sort((a, b) => Number(b.status === "Active") - Number(a.status === "Active"))
-    .map(fromRentcast)
+    .map((r) => fromRentcast(r, { needAgent: false }))
     .filter((l): l is SourceListing => !!l);
 }

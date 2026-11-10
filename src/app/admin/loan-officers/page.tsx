@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { listings, loanOfficers } from "@/lib/store";
-import { buildPath } from "@/lib/loLinks";
+import { accountPath, buildPath } from "@/lib/loLinks";
+import { billingLabel } from "@/lib/plan";
 import { siteUrl } from "@/lib/site";
 import { CopyButton } from "@/components/CopyButton";
 
@@ -29,6 +30,11 @@ export default async function LoanOfficersPage() {
               <div className="small muted">
                 {lo.company} · NMLS #{lo.nmls}
               </div>
+              {lo.billing ? (
+                <div className="small">
+                  <strong>Self-signup</strong> · {billingLabel(lo)}
+                </div>
+              ) : null}
               <div className="small muted">
                 Slug: <code>{lo.slug}</code> · {counts.get(lo.slug) ?? 0} listings
               </div>
@@ -42,6 +48,11 @@ export default async function LoanOfficersPage() {
                 <Link className="btn btn-small btn-ghost" href={`/admin/listings/new?lo=${lo.slug}`}>
                   + Listing
                 </Link>
+                {accountPath(lo.slug) ? (
+                  <Link className="btn btn-small btn-ghost" href={accountPath(lo.slug)!} target="_blank">
+                    Account page
+                  </Link>
+                ) : null}
                 {buildPath(lo.slug) ? (
                   <CopyButton
                     text={`${origin}${buildPath(lo.slug)}`}
