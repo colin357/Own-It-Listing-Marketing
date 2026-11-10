@@ -30,6 +30,9 @@ function emailParts(ls: Listing[], lo: LoanOfficer | null, origin: string): Part
   const who = firstName(ls[0].agent.name);
   const hi: Part = { kind: "p", text: `Hi${who ? ` ${who}` : ""},` };
   const bye: Part = { kind: "p", text: "Let me know if you'd like anything changed. And send any buyers with financing questions my way!" };
+  // Short signature: the loan officer's name, phone and company (Colin, 2026-11-10).
+  const sigLines = lo ? [lo.name, lo.phone, lo.company].map((x) => x?.trim()).filter(Boolean) : [];
+  const sig: Part[] = sigLines.length ? [{ kind: "p", text: sigLines.join("\n") }] : [];
   const payments = lo?.showPayments === false ? "" : " and payments";
   const short =
     "Each kit has social posts with captions, a printable flyer, a buyer page to text or post, and ready-to-send emails, plus a Download all button.";
@@ -70,6 +73,7 @@ function emailParts(ls: Listing[], lo: LoanOfficer | null, origin: string): Part
       },
       { kind: "link", text: "Download everything at once:", url: `${kitUrl}/download` },
       bye,
+      ...sig,
     ];
   }
 
@@ -112,6 +116,7 @@ function emailParts(ls: Listing[], lo: LoanOfficer | null, origin: string): Part
       ],
     },
     bye,
+    ...sig,
   ];
 }
 
