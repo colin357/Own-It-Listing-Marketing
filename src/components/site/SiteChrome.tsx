@@ -41,6 +41,7 @@ export function SiteFooter() {
             <Link href="/signup">Start free trial</Link>
             <Link href="/login">Sign in</Link>
             <a href={`mailto:${CONTACT_EMAIL}`}>Contact</a>
+            <Link href="/privacy">Privacy</Link>
             <a href="https://ownitsocial.com" target="_blank" rel="noreferrer">
               ownitsocial.com
             </a>
