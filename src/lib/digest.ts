@@ -73,14 +73,6 @@ function emailButton(ls: Listing[], lo: LoanOfficer, origin: string, label: stri
   return button(mailtoHref(agentEmailAddress(ls), agentEmailSubject(ls), agentEmailBody(ls, lo, origin)), label, true);
 }
 
-function emailNote(ls: Listing[], what: string): string {
-  const email = agentEmailAddress(ls);
-  const who = esc(firstName(ls[0].agent.name) ?? "the agent");
-  return `Opens an email to ${email ? esc(email) : who} in your mail app with ${what}. Just hit send.${
-    email ? "" : ` We don't have ${who}'s email address, so add it in the To line.`
-  }`;
-}
-
 /**
  * US phone as an sms: number (+1XXXXXXXXXX), or "" when we can't read it,
  * so the text draft opens with an empty To line.
@@ -101,25 +93,29 @@ function textButton(phone: string | undefined, message: string, label: string): 
   return button(`sms:${smsNumber(phone)}?&body=${encodeURIComponent(message)}`, label, true);
 }
 
-function textNote(phone: string | undefined, who: string, what: string): string {
-  return smsNumber(phone)
-    ? `Opens a text to ${esc(phone!.trim())} with ${what}. Just hit send.`
-    : `Opens a text with ${what}. We don't have ${who}'s cell number, so add it in the To line.`;
+/**
+ * The Email and Text buttons side by side (Colin: same line), short labels
+ * so the pair fits a phone, then one note saying where each one goes.
+ */
+function sendButtons(email: string, text: string): string {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+      <td valign="top" style="padding:0 8px 0 0">${email}</td>
+      <td valign="top">${text}</td>
+    </tr></table>`;
 }
 
-/** Text button with its note under it. */
-function textRow(button: string, note: string): string {
-  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:4px 0 0">
-      <tr><td style="padding:0 0 6px">${button}</td></tr>
-      <tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.4;color:#5b5b5b">${note}</td></tr>
-    </table>`;
+function sendNote(ls: Listing[], what: string): string {
+  const email = agentEmailAddress(ls);
+  const phone = smsNumber(ls[0].agent.phone) ? ls[0].agent.phone!.trim() : "";
+  const who = esc(firstName(ls[0].agent.name) ?? "the agent");
+  const missing = [!email && "email address", !phone && "cell number"].filter(Boolean).join(" or ");
+  return `Opens an email${email ? ` to ${esc(email)}` : ""} or a text${phone ? ` to ${esc(phone)}` : ""} with ${what}, from your own email or phone. Just hit send.${
+    missing ? ` We don't have ${who}'s ${missing}, so add it in the To line.` : ""
+  }`;
 }
 
 function kitCard(l: Listing, lo: LoanOfficer, origin: string): string {
   const kitUrl = `${origin}/l/${l.slug}`;
-  const agentFirst = firstName(l.agent.name);
-  const mailLabel = `Email kit to ${esc(agentFirst ?? "the agent")}`;
-  const mailNote = emailNote([l], "the kit link");
   const facts = [formatPrice(l.price), statsLine(l)].filter(Boolean).join(" · ");
   const agent = [l.agent.name, l.agent.brokerage].filter(Boolean).join(", ");
   const photo = l.photos[0]
@@ -136,7 +132,7 @@ function kitCard(l: Listing, lo: LoanOfficer, origin: string): string {
     <p style="margin:4px 0 0;font-size:14px;color:#5b5b5b">${esc(facts)}</p>
     <p style="margin:10px 0 0;font-size:14px;color:#0a0a0a">Listed by <strong>${esc(agent)}</strong>${l.agent.phone ? ` · ${esc(l.agent.phone)}` : ""}${l.agent.email ? ` · ${esc(l.agent.email)}` : ""}</p>
     ${noPhotos}
-    ${buttonRows(emailButton([l], lo, origin, mailLabel), mailNote + textRow(textButton(l.agent.phone, agentMessage(l, kitUrl), `Text kit to ${esc(agentFirst ?? "the agent")}`), textNote(l.agent.phone, esc(agentFirst ?? "the agent"), "the kit link")), [
+    ${buttonRows(sendButtons(emailButton([l], lo, origin, "Email kit"), textButton(l.agent.phone, agentMessage(l, kitUrl), "Text kit")), sendNote([l], "the kit link"), [
       button(kitUrl, "Open kit", false),
       button(`${kitUrl}/download`, "Download all", false),
     ])}
@@ -179,11 +175,8 @@ function groupKitRow(l: Listing, origin: string, last: boolean): string {
  */
 function agentGroupCard(ls: Listing[], lo: LoanOfficer, origin: string): string {
   const a = ls[0].agent;
-  const agentFirst = firstName(a.name);
-  const name = esc(agentFirst ?? "the agent");
   const email = agentEmailAddress(ls);
   const count = ls.length === 2 ? "both kits" : `all ${ls.length} kits`;
-  const mailNote = emailNote(ls, `links to ${count}`);
   const agent = [a.name, a.brokerage].filter(Boolean).join(", ");
   return `
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e4e3e0;margin:0 0 20px">
@@ -192,10 +185,9 @@ function agentGroupCard(ls: Listing[], lo: LoanOfficer, origin: string): string 
     <p style="margin:4px 0 0;font-size:18px;font-weight:700;color:#0a0a0a">${esc(agent)}</p>
     ${a.phone || email ? `<p style="margin:4px 0 0;font-size:14px;color:#5b5b5b">${[a.phone, email].filter(Boolean).map((x) => esc(x!)).join(" · ")}</p>` : ""}
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:14px 0 0">
-      <tr><td style="padding:0 0 6px">${emailButton(ls, lo, origin, `Email ${count} to ${name}`)}</td></tr>
-      <tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.4;color:#5b5b5b">${mailNote}</td></tr>
+      <tr><td style="padding:0 0 6px">${sendButtons(emailButton(ls, lo, origin, "Email kits"), textButton(a.phone, groupAgentMessage(ls, origin), "Text kits"))}</td></tr>
+      <tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.4;color:#5b5b5b">${sendNote(ls, `links to ${count}`)}</td></tr>
     </table>
-    ${textRow(textButton(a.phone, groupAgentMessage(ls, origin), `Text ${count} to ${name}`), textNote(a.phone, name, `links to ${count}`))}
   </td></tr>
   ${ls.map((l, i) => groupKitRow(l, origin, i === ls.length - 1)).join("")}
 </table>`;
