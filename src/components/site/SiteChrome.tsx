@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { CONTACT_EMAIL } from "@/lib/plan";
 
@@ -5,9 +6,8 @@ export function SiteHeader({ right }: { right?: React.ReactNode }) {
   return (
     <header className="site-nav">
       <div className="wrap site-nav-inner">
-        <Link href="/" className="site-mark">
-          Listing Kits
-          <small>by Own It Social</small>
+        <Link href="/" className="site-mark" aria-label="Own It Social home">
+          <Image src="/brand/own-it-social-logo.png" alt="Own It Social" width={480} height={203} priority />
         </Link>
         <nav className="site-nav-links">
           {right ?? (
