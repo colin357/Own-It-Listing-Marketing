@@ -1,0 +1,20 @@
+/* Loan officer "email the kit to the agent" page (desktop-friendly email with clickable links). */
+.ea-main { padding-top: clamp(40px, 7vw, 80px); padding-bottom: 120px; }
+.ea-main > * { max-width: 760px; }
+.ea-lead { margin: 18px 0 32px; }
+.ea-options { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.ea-option { border: 1px solid var(--line); background: var(--white); padding: 24px; display: grid; gap: 14px; align-content: start; justify-items: start; }
+.ea-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; justify-items: start; }
+.ea-preview { margin-top: 40px; border: 1px solid var(--line); background: var(--white); }
+.ea-head { display: grid; grid-template-columns: auto 1fr; gap: 10px 18px; margin: 0; padding: 18px 24px; border-bottom: 1px solid var(--line); align-items: center; }
+.ea-head dd { margin: 0; overflow-wrap: anywhere; }
+.ea-subject { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.ea-body { padding: 24px; }
+.ea-body a { overflow-wrap: anywhere; }
+@media (max-width: 720px) {
+  .ea-options { grid-template-columns: 1fr; }
+  .ea-option, .ea-body { padding: 18px; }
+  /* The Outlook draft file only opens in desktop Outlook. */
+  .ea-desktop { display: none; }
+  .ea-head { padding: 16px 18px; }
+}

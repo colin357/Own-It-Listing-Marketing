@@ -2,8 +2,7 @@ import "server-only";
 import { isActive } from "./plan";
 import { detections, listings, loanOfficers } from "./store";
 import { firstName, formatPrice, statsLine, streetLine } from "./format";
-import { programOptions } from "./mortgage";
-import { buyerPagePath } from "./site";
+import { agentEmailAddress, agentEmailPagePath, groupByAgent } from "./agentEmail";
 import { mailConfigured, sendMail, type Mail } from "./mail";
 import type { Detection } from "./detect/types";
 import { sameHome } from "./detect/dedupe";
@@ -27,155 +26,14 @@ export interface Digest {
   html: string;
 }
 
+/** Turn bare https links in already-escaped text into real links (desktop Outlook doesn't do it). */
+function linkify(escaped: string): string {
+  return escaped.replace(/https?:\/\/[^\s<]+/g, (u) => `<a href="${u}" target="_blank" style="color:#0a0a0a">${u}</a>`);
+}
+
 function agentMessage(l: Listing, kitUrl: string): string {
   const who = firstName(l.agent.name);
   return `Hi${who ? ` ${who}` : ""}, congrats on ${streetLine(l)}! I put together a free marketing kit for it: social posts, flyers, captions and emails, all ready to download. ${kitUrl}`;
-}
-
-const EMAIL_RE = /^[^\s@,;<>"]+@[^\s@,;<>"]+\.[^\s@,;<>"]+$/;
-
-/**
- * Plain-text body of the kit email to the listing agent. A mailto: draft can't
- * carry HTML, so it's laid out with short CAPS headings, numbered steps and
- * links on their own lines (mail apps turn those into tappable links). It tells
- * the agent what each part of the kit is for and how to use it.
- */
-export function agentEmailBody(l: Listing, lo: LoanOfficer | null, origin: string): string {
-  const kitUrl = `${origin}/l/${l.slug}`;
-  const who = firstName(l.agent.name);
-  const forSale = l.status !== "just-sold" && l.status !== "under-contract";
-  // The seller credit section only shows on kits that show payments.
-  const sellerCredit = forSale && !!lo && !!programOptions({ ...l, concession: undefined }, lo);
-  const steps = [
-    `Social posts: Save a post or story and share it on Instagram, Facebook or LinkedIn. Captions are written for you, just tap Copy.`,
-    `Flyers: Print the flyer for showings and open houses. The QR code takes buyers to the home's page.`,
-    `Buyer page: Text or post this link. Buyers see photos, details${lo?.showPayments === false ? "" : " and payments"}, and can call you for a tour in one tap:\n${origin}${buyerPagePath(l.slug)}`,
-    ...(sellerCredit
-      ? [`Seller credit: If your seller will help with buyer costs, pick an option and every graphic and flyer updates to show the lower payment.`]
-      : []),
-    `Emails: Ready-to-send emails for your sphere and buyers are at the bottom of the kit.`,
-  ];
-  return [
-    `Hi${who ? ` ${who}` : ""},`,
-    l.status === "just-listed"
-      ? `Congrats on your new listing at ${streetLine(l)}! I put together a free marketing kit for it, made for this home and ready to post, print or send.`
-      : `I put together a free marketing kit for your listing at ${streetLine(l)}, made for this home and ready to post, print or send.`,
-    `YOUR KIT\n${kitUrl}`,
-    ...(l.photos.length
-      ? []
-      : [`We couldn't find your listing photos yet. Add them at the top of the kit and every graphic updates.`]),
-    `HOW TO USE IT\n\n${steps.map((t, i) => `${i + 1}. ${t}`).join("\n\n")}`,
-    `Download everything at once:\n${kitUrl}/download`,
-    `Let me know if you'd like anything changed. And send any buyers with financing questions my way!`,
-  ].join("\n\n");
-}
-
-/**
- * Plain-text body of one email to an agent with several new listings in the
- * same batch: every kit's links first, then one how-to-use guide that covers
- * them all. If the draft would get too long for a mailto: link (lots of
- * listings), the guide is cut down to one line so every kit link still fits.
- */
-export function agentGroupEmailBody(ls: Listing[], lo: LoanOfficer | null, origin: string): string {
-  if (ls.length === 1) return agentEmailBody(ls[0], lo, origin);
-  const who = firstName(ls[0].agent.name);
-  const anyNew = ls.some((l) => l.status === "just-listed");
-  const sellerCredit =
-    !!lo &&
-    ls.some(
-      (l) =>
-        l.status !== "just-sold" && l.status !== "under-contract" && !!programOptions({ ...l, concession: undefined }, lo),
-    );
-  const kits = (buyerLinks: boolean) =>
-    ls
-      .map(
-        (l, i) =>
-          `${i + 1}. ${streetLine(l)}\nKit: ${origin}/l/${l.slug}` +
-          (buyerLinks ? `\nBuyer page: ${origin}${buyerPagePath(l.slug)}` : ""),
-      )
-      .join("\n\n");
-  const missingPhotos = ls.filter((l) => !l.photos.length);
-  const steps = [
-    `Social posts: Save a post or story and share it on Instagram, Facebook or LinkedIn. Captions are written for you, just tap Copy.`,
-    `Flyers: Print the flyer for showings and open houses. The QR code takes buyers to the home's page.`,
-    `Buyer pages: Text or post the buyer page link for each home. Buyers see photos, details${lo?.showPayments === false ? "" : " and payments"}, and can call you for a tour in one tap.`,
-    ...(sellerCredit
-      ? [`Seller credit: If a seller will help with buyer costs, pick an option on that kit and every graphic and flyer updates to show the lower payment.`]
-      : []),
-    `Emails: Ready-to-send emails for your sphere and buyers are at the bottom of each kit.`,
-    `Download: Each kit has a Download all button to save everything at once.`,
-  ];
-  const build = (guide: string, buyerLinks = true) =>
-    [
-      `Hi${who ? ` ${who}` : ""},`,
-      anyNew
-        ? `Congrats on your new listings! I put together a free marketing kit for each of your ${ls.length} homes, made for that home and ready to post, print or send.`
-        : `I put together a free marketing kit for each of your ${ls.length} listings, made for that home and ready to post, print or send.`,
-      `YOUR KITS\n\n${kits(buyerLinks)}`,
-      ...(missingPhotos.length
-        ? [`We couldn't find listing photos for ${missingPhotos.map(streetLine).join(", ")} yet. Add them at the top of that kit and every graphic updates.`]
-        : []),
-      guide,
-      `Let me know if you'd like anything changed. And send any buyers with financing questions my way!`,
-    ].join("\n\n");
-  const short = `Each kit has social posts with captions, a printable flyer, a buyer page to text or post, and ready-to-send emails, plus a Download all button.`;
-  const tries = [
-    build(`HOW TO USE THEM\n\n${steps.map((t, i) => `${i + 1}. ${t}`).join("\n\n")}`),
-    build(short),
-    build(short, false),
-  ];
-  return tries.find((b) => encodedBodyLength(b) <= GROUP_BODY_MAX) ?? tries[tries.length - 1];
-}
-
-const encodedBodyLength = (body: string) => encodeURIComponent(body.replace(/\n/g, "\r\n")).length;
-
-/**
- * Longest encoded multi-listing body before it's cut down. Some mail apps
- * (Outlook for Windows) drop mailto: links much over 2,000 characters, and the
- * address and subject take up to ~150 more.
- */
-const GROUP_BODY_MAX = 1850;
-
-function mailtoHref(email: string, subject: string, body: string): { href: string; hasEmail: boolean } {
-  const hasEmail = EMAIL_RE.test(email);
-  // encodeURIComponent (not URLSearchParams) so spaces become %20, which every mail app reads.
-  const to = hasEmail ? encodeURIComponent(email).replace(/%40/g, "@") : "";
-  const href = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body.replace(/\n/g, "\r\n"))}`;
-  return { href, hasEmail };
-}
-
-/** The agent email address we'd send to: the first usable one across their listings. */
-function agentEmail(ls: Listing[]): string {
-  return ls.map((l) => l.agent.email?.trim() ?? "").find((e) => EMAIL_RE.test(e)) ?? "";
-}
-
-/**
- * A mailto: link that opens a ready-to-send email to the listing agent in the
- * loan officer's own mail app, so the agent sees it come from the loan officer.
- * When we don't have a usable agent email, the draft opens with an empty To line.
- */
-export function agentMailto(l: Listing, lo: LoanOfficer | null, origin: string): { href: string; hasEmail: boolean } {
-  return mailtoHref(l.agent.email?.trim() ?? "", `Your marketing kit for ${streetLine(l)}`, agentEmailBody(l, lo, origin));
-}
-
-/** One mailto: draft to an agent covering all of their listings in this email. */
-export function agentGroupMailto(ls: Listing[], lo: LoanOfficer | null, origin: string): { href: string; hasEmail: boolean } {
-  if (ls.length === 1) return agentMailto(ls[0], lo, origin);
-  return mailtoHref(agentEmail(ls), `Marketing kits for your ${ls.length} listings`, agentGroupEmailBody(ls, lo, origin));
-}
-
-/**
- * Listings grouped by listing agent (same name, or same email when there's no
- * name), agents in alphabetical order and each agent's homes by address.
- */
-export function groupByAgent(ls: Listing[]): Listing[][] {
-  const key = (l: Listing) =>
-    l.agent.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() || (l.agent.email ?? "").trim().toLowerCase() || l.slug;
-  const groups = new Map<string, Listing[]>();
-  for (const l of ls) groups.set(key(l), [...(groups.get(key(l)) ?? []), l]);
-  return [...groups.values()]
-    .map((g) => g.sort((a, b) => a.address.localeCompare(b.address)))
-    .sort((a, b) => a[0].agent.name.localeCompare(b[0].agent.name) || a[0].address.localeCompare(b[0].address));
 }
 
 /**
@@ -209,14 +67,24 @@ function buttonRows(primary: string, note: string, secondary: string[]): string 
     </table>`;
 }
 
+/**
+ * Under each "Email kit" button. The button opens the kit email with real
+ * links (a plain mailto: draft leaves links clickable on some devices and not
+ * others), ready to send from the loan officer's own mail app.
+ */
+function emailNote(email: string | null, agentFirst: string | null | undefined, what: string): string {
+  const who = esc(agentFirst ?? "the agent");
+  return `Opens your email to ${email ? esc(email) : who} with ${what}. Copy it into a new email, or open it as an Outlook draft, and hit send. The links stay clickable on any device.${
+    email ? "" : ` We don't have ${who}'s email address, so add it in the To line.`
+  }`;
+}
+
 function kitCard(l: Listing, lo: LoanOfficer, origin: string): string {
   const kitUrl = `${origin}/l/${l.slug}`;
   const agentFirst = firstName(l.agent.name);
-  const mail = agentMailto(l, lo, origin);
+  const email = agentEmailAddress(l);
   const mailLabel = `Email kit to ${esc(agentFirst ?? "the agent")}`;
-  const mailNote = mail.hasEmail
-    ? `Opens an email to ${esc(l.agent.email!.trim())} in your mail app with the kit link. Just hit send.`
-    : `Opens an email with the kit link in your mail app. We don't have ${esc(agentFirst ?? "the agent")}'s email address, so add it in the To line.`;
+  const mailNote = emailNote(email, agentFirst, "the kit link");
   const facts = [formatPrice(l.price), statsLine(l)].filter(Boolean).join(" · ");
   const agent = [l.agent.name, l.agent.brokerage].filter(Boolean).join(", ");
   const photo = l.photos[0]
@@ -233,12 +101,12 @@ function kitCard(l: Listing, lo: LoanOfficer, origin: string): string {
     <p style="margin:4px 0 0;font-size:14px;color:#5b5b5b">${esc(facts)}</p>
     <p style="margin:10px 0 0;font-size:14px;color:#0a0a0a">Listed by <strong>${esc(agent)}</strong>${l.agent.phone ? ` · ${esc(l.agent.phone)}` : ""}${l.agent.email ? ` · ${esc(l.agent.email)}` : ""}</p>
     ${noPhotos}
-    ${buttonRows(button(mail.href, mailLabel, true), mailNote, [
+    ${buttonRows(button(`${origin}${agentEmailPagePath(l)}`, mailLabel, true), mailNote, [
       button(kitUrl, "Open kit", false),
       button(`${kitUrl}/download`, "Download all", false),
     ])}
     <p style="margin:16px 0 4px;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#5b5b5b">Or copy and text to ${esc(agentFirst ?? "the agent")}</p>
-    <p style="margin:0;padding:12px 14px;background:#f4f3f1;font-size:14px;line-height:1.5;color:#0a0a0a">${esc(agentMessage(l, kitUrl))}</p>
+    <p style="margin:0;padding:12px 14px;background:#f4f3f1;font-size:14px;line-height:1.5;color:#0a0a0a">${linkify(esc(agentMessage(l, kitUrl)))}</p>
   </td></tr>
 </table>`;
 }
@@ -280,12 +148,9 @@ function agentGroupCard(ls: Listing[], lo: LoanOfficer, origin: string): string 
   const a = ls[0].agent;
   const agentFirst = firstName(a.name);
   const name = esc(agentFirst ?? "the agent");
-  const email = agentEmail(ls);
-  const mail = agentGroupMailto(ls, lo, origin);
+  const email = agentEmailAddress(ls);
   const count = ls.length === 2 ? "both kits" : `all ${ls.length} kits`;
-  const mailNote = mail.hasEmail
-    ? `Opens one email to ${esc(email)} in your mail app with links to ${count}. Just hit send.`
-    : `Opens one email in your mail app with links to ${count}. We don't have ${name}'s email address, so add it in the To line.`;
+  const mailNote = emailNote(email, agentFirst, `links to ${count}`);
   const agent = [a.name, a.brokerage].filter(Boolean).join(", ");
   return `
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e4e3e0;margin:0 0 20px">
@@ -294,11 +159,11 @@ function agentGroupCard(ls: Listing[], lo: LoanOfficer, origin: string): string 
     <p style="margin:4px 0 0;font-size:18px;font-weight:700;color:#0a0a0a">${esc(agent)}</p>
     ${a.phone || email ? `<p style="margin:4px 0 0;font-size:14px;color:#5b5b5b">${[a.phone, email].filter(Boolean).map((x) => esc(x!)).join(" · ")}</p>` : ""}
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:14px 0 0">
-      <tr><td style="padding:0 0 6px">${button(mail.href, `Email ${count} to ${name}`, true)}</td></tr>
+      <tr><td style="padding:0 0 6px">${button(`${origin}${agentEmailPagePath(ls)}`, `Email ${count} to ${name}`, true)}</td></tr>
       <tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.4;color:#5b5b5b">${mailNote}</td></tr>
     </table>
     <p style="margin:16px 0 4px;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#5b5b5b">Or copy and text to ${name}</p>
-    <p style="margin:0;padding:12px 14px;background:#f4f3f1;font-size:14px;line-height:1.5;color:#0a0a0a">${esc(groupAgentMessage(ls, origin)).replace(/\n/g, "<br>")}</p>
+    <p style="margin:0;padding:12px 14px;background:#f4f3f1;font-size:14px;line-height:1.5;color:#0a0a0a">${linkify(esc(groupAgentMessage(ls, origin))).replace(/\n/g, "<br>")}</p>
   </td></tr>
   ${ls.map((l, i) => groupKitRow(l, origin, i === ls.length - 1)).join("")}
 </table>`;
