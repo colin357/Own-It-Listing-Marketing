@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { signupAction, type SignupState } from "./actions";
+import { trackMeta } from "@/components/site/MetaPixel";
 
 export function SignupForm({ trialDays, price }: { trialDays: number; price: number }) {
   const [state, action, pending] = useActionState<SignupState, FormData>(signupAction, {});
@@ -13,7 +14,7 @@ export function SignupForm({ trialDays, price }: { trialDays: number; price: num
     </label>
   );
   return (
-    <form action={action} className="site-form" key={state.values ? JSON.stringify(state.values) : "initial"}>
+    <form action={action} onSubmit={() => trackMeta("InitiateCheckout")} className="site-form" key={state.values ? JSON.stringify(state.values) : "initial"}>
       {state.issues?.length ? (
         <div className="site-alert" role="alert">
           {state.issues.map((i) => (

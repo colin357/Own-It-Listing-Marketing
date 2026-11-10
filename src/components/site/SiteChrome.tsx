@@ -1,10 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import { CONTACT_EMAIL } from "@/lib/plan";
+import { MetaPixel } from "./MetaPixel";
 
 export function SiteHeader({ right }: { right?: React.ReactNode }) {
   return (
     <header className="site-nav">
+      <MetaPixel />
       <div className="wrap site-nav-inner">
         <Link href="/" className="site-mark" aria-label="Own It Social home">
           <Image src="/brand/own-it-social-logo.png" alt="Own It Social" width={480} height={203} priority />

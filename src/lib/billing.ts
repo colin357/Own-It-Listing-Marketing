@@ -6,6 +6,7 @@ import { PLAN } from "./plan";
 import { accountPath } from "./loLinks";
 import { mailConfigured, sendMail } from "./mail";
 import type { Billing, LoanOfficer } from "./types";
+import { sendMetaEvent, type MetaClick } from "./metaCapi";
 
 /**
  * Self-signup billing. A loan officer fills in the signup form, pays (or
@@ -76,14 +77,18 @@ export async function createCheckout(
   origin: string,
   customerId?: string,
   cancelPath = "/signup?canceled=1",
+  click?: MetaClick,
 ): Promise<string> {
   const metadata: Record<string, string> = {};
   for (const [k, v] of Object.entries(input)) if (v) metadata[k] = String(v).slice(0, 450);
+  // Ad-click details ride on the checkout session only (not the subscription) for the Meta trial event.
+  const clickMeta: Record<string, string> = {};
+  for (const [k, v] of Object.entries(click ?? {})) if (v) clickMeta[`meta_${k}`] = String(v).slice(0, 450);
   const session = await stripe().checkout.sessions.create({
     mode: "subscription",
     line_items: [{ price: await planPrice(), quantity: 1 }],
     ...(customerId ? { customer: customerId } : { customer_email: input.email }),
-    metadata,
+    metadata: { ...metadata, ...clickMeta },
     subscription_data: { trial_period_days: (!customerId && PLAN.trialDays) || undefined, metadata },
     // Card up front, even for the free trial.
     payment_method_collection: "always",
@@ -169,6 +174,18 @@ export async function activateCheckout(sessionId: string, origin: string): Promi
     await documents.set(customerKey(customerId), lo.slug);
     await s.customers.update(customerId, { metadata: { loanOfficerSlug: lo.slug } }).catch(() => {});
     await sendWelcome(lo, origin).catch((err) => console.error("Welcome email failed", err));
+    if (sub.status === "trialing") {
+      await sendMetaEvent({
+        name: "StartTrial",
+        id: `trial-${sessionId}`,
+        email: lo.email,
+        phone: lo.phone,
+        fullName: lo.name,
+        value: PLAN.priceUsd,
+        url: `${origin}/signup`,
+        click: { fbp: m.meta_fbp, fbc: m.meta_fbc, ip: m.meta_ip, ua: m.meta_ua },
+      });
+    }
     return lo;
   } finally {
     await locks.release(`checkout-${sessionId}`, lock);
@@ -184,6 +201,17 @@ export async function syncSubscription(sub: Stripe.Subscription): Promise<LoanOf
   if (lo.billing?.subscriptionId && lo.billing.subscriptionId !== sub.id && sub.status === "canceled") return lo;
   const updated: LoanOfficer = { ...lo, billing: billingFrom(sub, lo.billing?.signedUpAt), updatedAt: new Date().toISOString() };
   await loanOfficers.save(updated);
+  // First payment after the free trial: report it to Meta so ads can optimize for paying customers.
+  if (lo.billing?.status === "trialing" && sub.status === "active") {
+    await sendMetaEvent({
+      name: "Subscribe",
+      id: `paid-${sub.id}`,
+      email: lo.email,
+      phone: lo.phone,
+      fullName: lo.name,
+      value: PLAN.priceUsd,
+    });
+  }
   return updated;
 }
 
