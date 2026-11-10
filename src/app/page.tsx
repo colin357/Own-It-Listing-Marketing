@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { PLAN } from "@/lib/plan";
@@ -85,10 +86,24 @@ export default function Home() {
               </p>
             </div>
             <div className="lp-stack" aria-label="Sample graphics from one listing kit">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img className="lp-stack-flyer" src="/sample/flyer.png" alt="Sample print flyer" width={1275} height={1650} />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img className="lp-stack-square" src="/sample/square.png" alt="Sample Just Listed post" width={1080} height={1080} />
+              <Image
+                className="lp-stack-flyer"
+                src="/sample/flyer.png"
+                alt="Sample print flyer"
+                width={1275}
+                height={1650}
+                sizes="(max-width: 900px) 64vw, 380px"
+                preload
+              />
+              <Image
+                className="lp-stack-square"
+                src="/sample/square.png"
+                alt="Sample Just Listed post"
+                width={1080}
+                height={1080}
+                sizes="(max-width: 900px) 58vw, 340px"
+                preload
+              />
             </div>
           </div>
         </section>
@@ -122,8 +137,13 @@ export default function Home() {
                 ["qualify", "What it takes", 1275, 1650],
               ].map(([file, label, w, h]) => (
                 <figure key={file}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={`/sample/${file}.png`} alt={`Sample ${label}`} width={w as number} height={h as number} loading="lazy" />
+                  <Image
+                    src={`/sample/${file}.png`}
+                    alt={`Sample ${label}`}
+                    width={w as number}
+                    height={h as number}
+                    sizes="(max-width: 900px) 50vw, 300px"
+                  />
                   <figcaption>{label}</figcaption>
                 </figure>
               ))}

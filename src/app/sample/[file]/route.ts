@@ -4,6 +4,14 @@ import { sampleKit } from "@/lib/sample";
 
 const SHOWN = ["square", "details", "story", "flyer", "payments", "ways", "qualify", "landscape"];
 
+// Made once per deploy at build time and served as ready files.
+export const dynamic = "force-static";
+export const dynamicParams = false;
+
+export function generateStaticParams() {
+  return SHOWN.map((name) => ({ file: `${name}.png` }));
+}
+
 /** Sample graphics for the landing page, rendered from the bundled demo listing. */
 export async function GET(_req: Request, ctx: RouteContext<"/sample/[file]">) {
   const { file } = await ctx.params;
