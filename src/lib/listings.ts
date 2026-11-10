@@ -5,6 +5,7 @@ import { parseListingInput, parseLoanOfficerInput, ValidationError } from "./val
 import type { Listing, LoanOfficer } from "./types";
 import { applyRates, currentMarketRates } from "./rates";
 import { withSavedHeadshot } from "./agentHeadshots";
+import { demoKit, isDemo } from "./demo";
 
 export async function createListing(raw: Record<string, unknown>): Promise<Listing> {
   const input = parseListingInput(raw);
@@ -40,6 +41,7 @@ export async function saveLoanOfficer(raw: Record<string, unknown>, existingSlug
 
 /** Listing plus its loan officer, or null if either is missing. */
 export async function getKit(slug: string): Promise<{ listing: Listing; lo: LoanOfficer } | null> {
+  if (isDemo(slug)) return demoKit();
   const stored = await listings.get(slug);
   if (!stored) return null;
   const [listing, lo, rates] = await Promise.all([

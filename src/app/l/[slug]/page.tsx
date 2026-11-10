@@ -27,6 +27,8 @@ import { activeConcession, concessionTag, isLuxury } from "@/lib/concessions";
 import { ConcessionCalculator } from "@/components/ConcessionCalculator";
 import { GraphicsTabs } from "@/components/GraphicsTabs";
 import { buyerPagePath, siteUrl } from "@/lib/site";
+import { isDemo } from "@/lib/demo";
+import { PLAN } from "@/lib/plan";
 
 function assetUrl(slug: string, file: string, version: string, download = false) {
   const v = encodeURIComponent(version);
@@ -135,6 +137,18 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
 
   return (
     <div className="kit" style={{ "--accent": accent, "--on-accent": onAccent } as CSSProperties}>
+      {isDemo(l.slug) ? (
+        <div className="demo-bar">
+          <div className="wrap demo-bar-inner">
+            <p>
+              <strong>Sample kit.</strong> This is the page your agent gets for every new listing, with your name on it.
+            </p>
+            <a className="demo-bar-cta" href="/signup">
+              Start {PLAN.trialDays}-day free trial
+            </a>
+          </div>
+        </div>
+      ) : null}
       <header className="nav">
         <div className="wrap nav-inner">
           {lo.logoUrl ? (
