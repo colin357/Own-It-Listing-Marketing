@@ -116,7 +116,7 @@
 .acct > * { max-width: 860px; }
 .acct > .display { margin-bottom: 32px; }
 .acct-intro { margin: 0 0 24px; max-width: 640px; }
-.acct-status { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; border: 1px solid var(--line); padding: 20px 24px; margin-bottom: 24px; }
+.acct-status { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; border: 1px solid var(--line); padding: 20px 24px; margin: 48px 0 0; }
 .acct-plan { font-weight: 600; margin: 4px 0 2px; }
 .acct-warn { color: var(--danger); font-weight: 600; }
 .acct-steps { background: var(--paper); padding: 24px 28px; margin: 24px 0; }
