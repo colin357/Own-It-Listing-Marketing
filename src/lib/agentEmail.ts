@@ -8,12 +8,11 @@ import type { Listing, LoanOfficer } from "./types";
  * agent with several new listings, all their kits in one email).
  *
  * The words live in one place (emailParts) and come out two ways:
- * - HTML with real <a> links (agentEmailHtml). This is what loan officers
- *   send, from the "Email kit" page: as an Outlook draft file or copied and
- *   pasted. Real links are clickable in every mail app on every device.
- * - Plain text (agentEmailBody), for the .eml / clipboard text fallback and
- *   the mailto: draft. A plain-text link is only clickable if the agent's mail
- *   app decides to linkify it, which desktop Outlook and others often don't.
+ * - Plain text (agentEmailBody) for the one-tap mailto: draft behind every
+ *   "Email kit" button. A plain-text link is only clickable if the agent's
+ *   mail app linkifies it (most phones do; desktop Outlook often doesn't).
+ * - HTML with real <a> links (agentEmailHtml), on the backup "formatted
+ *   version" page (/l/<slug>/email-agent): Outlook draft file or copy/paste.
  */
 
 const EMAIL_RE = /^[^\s@,;<>"]+@[^\s@,;<>"]+\.[^\s@,;<>"]+$/;

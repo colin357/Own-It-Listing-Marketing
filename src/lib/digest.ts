@@ -2,7 +2,7 @@ import "server-only";
 import { isActive } from "./plan";
 import { detections, listings, loanOfficers } from "./store";
 import { firstName, formatPrice, statsLine, streetLine } from "./format";
-import { agentEmailAddress, agentEmailPagePath, groupByAgent } from "./agentEmail";
+import { agentEmailAddress, agentEmailBody, agentEmailPagePath, agentEmailSubject, groupByAgent, mailtoHref } from "./agentEmail";
 import { mailConfigured, sendMail, type Mail } from "./mail";
 import type { Detection } from "./detect/types";
 import { sameHome } from "./detect/dedupe";
@@ -68,23 +68,30 @@ function buttonRows(primary: string, note: string, secondary: string[]): string 
 }
 
 /**
- * Under each "Email kit" button. The button opens the kit email with real
- * links (a plain mailto: draft leaves links clickable on some devices and not
- * others), ready to send from the loan officer's own mail app.
+ * The "Email kit" button: a one-tap mailto: draft in the loan officer's own
+ * mail app (Colin's choice, 2026-11-10: one tap beats guaranteed links). Its
+ * body is plain text, so links are clickable only where the agent's mail app
+ * turns them into links (most phones; desktop Outlook often doesn't). The
+ * note under it links the formatted version, with real links, as a backup.
  */
-function emailNote(email: string | null, agentFirst: string | null | undefined, what: string): string {
-  const who = esc(agentFirst ?? "the agent");
-  return `Opens your email to ${email ? esc(email) : who} with ${what}. Copy it into a new email, or open it as an Outlook draft, and hit send. The links stay clickable on any device.${
+function emailButton(ls: Listing[], lo: LoanOfficer, origin: string, label: string): string {
+  return button(mailtoHref(agentEmailAddress(ls), agentEmailSubject(ls), agentEmailBody(ls, lo, origin)), label, true);
+}
+
+function emailNote(ls: Listing[], origin: string, what: string): string {
+  const email = agentEmailAddress(ls);
+  const who = esc(firstName(ls[0].agent.name) ?? "the agent");
+  const backup = `${origin}${agentEmailPagePath(ls)}`;
+  return `Opens an email to ${email ? esc(email) : who} in your mail app with ${what}. Just hit send.${
     email ? "" : ` We don't have ${who}'s email address, so add it in the To line.`
-  }`;
+  } <a href="${esc(backup)}" target="_blank" style="color:#5b5b5b;text-decoration:underline">Links not clickable for ${who}? Send the formatted version.</a>`;
 }
 
 function kitCard(l: Listing, lo: LoanOfficer, origin: string): string {
   const kitUrl = `${origin}/l/${l.slug}`;
   const agentFirst = firstName(l.agent.name);
-  const email = agentEmailAddress(l);
   const mailLabel = `Email kit to ${esc(agentFirst ?? "the agent")}`;
-  const mailNote = emailNote(email, agentFirst, "the kit link");
+  const mailNote = emailNote([l], origin, "the kit link");
   const facts = [formatPrice(l.price), statsLine(l)].filter(Boolean).join(" · ");
   const agent = [l.agent.name, l.agent.brokerage].filter(Boolean).join(", ");
   const photo = l.photos[0]
@@ -101,7 +108,7 @@ function kitCard(l: Listing, lo: LoanOfficer, origin: string): string {
     <p style="margin:4px 0 0;font-size:14px;color:#5b5b5b">${esc(facts)}</p>
     <p style="margin:10px 0 0;font-size:14px;color:#0a0a0a">Listed by <strong>${esc(agent)}</strong>${l.agent.phone ? ` · ${esc(l.agent.phone)}` : ""}${l.agent.email ? ` · ${esc(l.agent.email)}` : ""}</p>
     ${noPhotos}
-    ${buttonRows(button(`${origin}${agentEmailPagePath(l)}`, mailLabel, true), mailNote, [
+    ${buttonRows(emailButton([l], lo, origin, mailLabel), mailNote, [
       button(kitUrl, "Open kit", false),
       button(`${kitUrl}/download`, "Download all", false),
     ])}
@@ -150,7 +157,7 @@ function agentGroupCard(ls: Listing[], lo: LoanOfficer, origin: string): string 
   const name = esc(agentFirst ?? "the agent");
   const email = agentEmailAddress(ls);
   const count = ls.length === 2 ? "both kits" : `all ${ls.length} kits`;
-  const mailNote = emailNote(email, agentFirst, `links to ${count}`);
+  const mailNote = emailNote(ls, origin, `links to ${count}`);
   const agent = [a.name, a.brokerage].filter(Boolean).join(", ");
   return `
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e4e3e0;margin:0 0 20px">
@@ -159,7 +166,7 @@ function agentGroupCard(ls: Listing[], lo: LoanOfficer, origin: string): string 
     <p style="margin:4px 0 0;font-size:18px;font-weight:700;color:#0a0a0a">${esc(agent)}</p>
     ${a.phone || email ? `<p style="margin:4px 0 0;font-size:14px;color:#5b5b5b">${[a.phone, email].filter(Boolean).map((x) => esc(x!)).join(" · ")}</p>` : ""}
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:14px 0 0">
-      <tr><td style="padding:0 0 6px">${button(`${origin}${agentEmailPagePath(ls)}`, `Email ${count} to ${name}`, true)}</td></tr>
+      <tr><td style="padding:0 0 6px">${emailButton(ls, lo, origin, `Email ${count} to ${name}`)}</td></tr>
       <tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.4;color:#5b5b5b">${mailNote}</td></tr>
     </table>
     <p style="margin:16px 0 4px;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#5b5b5b">Or copy and text to ${name}</p>
