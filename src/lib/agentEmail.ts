@@ -7,17 +7,12 @@ import type { Listing, LoanOfficer } from "./types";
  * The email a loan officer sends a listing agent with their kit (or, for an
  * agent with several new listings, all their kits in one email).
  *
- * The words live in one place (emailParts) and come out two ways:
- * - Plain text (agentEmailBody) for the one-tap mailto: draft behind every
- *   "Email kit" button. A plain-text link is only clickable if the agent's
- *   mail app linkifies it (most phones do; desktop Outlook often doesn't).
- * - HTML with real <a> links (agentEmailHtml), on the backup "formatted
- *   version" page (/l/<slug>/email-agent): Outlook draft file or copy/paste.
+ * The words live in one place (emailParts) and come out as plain text for
+ * the one-tap mailto: draft. Plain-text links are clickable only where the
+ * agent's mail app linkifies them (most phones; desktop Outlook often doesn't).
  */
 
 const EMAIL_RE = /^[^\s@,;<>"]+@[^\s@,;<>"]+\.[^\s@,;<>"]+$/;
-
-const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 type Step = { label: string; text: string; url?: string };
 type Part =
@@ -170,48 +165,6 @@ export function agentEmailBody(ls: Listing | Listing[], lo: LoanOfficer | null, 
   return tries.find((b) => encodedBodyLength(b) <= GROUP_BODY_MAX) ?? tries[tries.length - 1];
 }
 
-/**
- * The same email as HTML, with every link a real <a> link (link text is the
- * address itself, so it reads the same as the plain version). Plain inline
- * styles only, so it survives being pasted into a draft or opened from an .eml.
- */
-export function agentEmailHtml(ls: Listing | Listing[], lo: LoanOfficer | null, origin: string): string {
-  const list = Array.isArray(ls) ? ls : [ls];
-  const font = "font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#0a0a0a";
-  const p = (inner: string) => `<p style="margin:0 0 14px;${font}">${inner}</p>`;
-  const a = (url: string) => `<a href="${esc(url)}" style="color:#0a58ca;text-decoration:underline">${esc(url)}</a>`;
-  const li = (inner: string) => `<li style="margin:0 0 10px;${font}">${inner}</li>`;
-  const ol = (items: string) => `<ol style="margin:0 0 14px;padding:0 0 0 22px">${items}</ol>`;
-  return emailParts(list, lo, origin)
-    .map((part) => {
-      switch (part.kind) {
-        case "p":
-          return p(esc(part.text));
-        case "link":
-          return p(
-            [part.heading ? `<strong>${esc(part.heading)}</strong>` : "", part.text ? esc(part.text) : "", a(part.url)]
-              .filter(Boolean)
-              .join("<br>"),
-          );
-        case "homes":
-          return (
-            p(`<strong>${esc(part.heading)}</strong>`) +
-            ol(
-              part.homes
-                .map((h) => li(`<strong>${esc(h.name)}</strong>${h.links.map((k) => `<br>${esc(k.label)}: ${a(k.url)}`).join("")}`))
-                .join(""),
-            )
-          );
-        case "steps":
-          return (
-            p(`<strong>${esc(part.heading)}</strong>`) +
-            ol(part.steps.map((s) => li(`<strong>${esc(s.label)}:</strong> ${esc(s.text)}${s.url ? `<br>${a(s.url)}` : ""}`)).join(""))
-          );
-      }
-    })
-    .join("\n");
-}
-
 export function agentEmailSubject(ls: Listing | Listing[]): string {
   const list = Array.isArray(ls) ? ls : [ls];
   return list.length === 1 ? `Your marketing kit for ${streetLine(list[0])}` : `Marketing kits for your ${list.length} listings`;
@@ -230,17 +183,6 @@ export function mailtoHref(to: string | null, subject: string, body?: string): s
   return `mailto:${addr}?subject=${encodeURIComponent(subject)}${
     body === undefined ? "" : `&body=${encodeURIComponent(body.replace(/\n/g, "\r\n"))}`
   }`;
-}
-
-/**
- * The "Email kit" page for one listing, or for several of one agent's listings
- * (the first slug in the path, the rest in ?with=). It shows the email with
- * real links and lets the loan officer send it from their own mail app.
- */
-export function agentEmailPagePath(ls: Listing | Listing[]): string {
-  const list = Array.isArray(ls) ? ls : [ls];
-  const rest = list.slice(1).map((l) => l.slug);
-  return `/l/${list[0].slug}/email-agent${rest.length ? `?with=${rest.map(encodeURIComponent).join(",")}` : ""}`;
 }
 
 /**

@@ -2,7 +2,7 @@ import "server-only";
 import { isActive } from "./plan";
 import { detections, listings, loanOfficers } from "./store";
 import { firstName, formatPrice, statsLine, streetLine } from "./format";
-import { agentEmailAddress, agentEmailBody, agentEmailPagePath, agentEmailSubject, groupByAgent, mailtoHref } from "./agentEmail";
+import { agentEmailAddress, agentEmailBody, agentEmailSubject, groupByAgent, mailtoHref } from "./agentEmail";
 import { mailConfigured, sendMail, type Mail } from "./mail";
 import type { Detection } from "./detect/types";
 import { sameHome } from "./detect/dedupe";
@@ -71,27 +71,26 @@ function buttonRows(primary: string, note: string, secondary: string[]): string 
  * The "Email kit" button: a one-tap mailto: draft in the loan officer's own
  * mail app (Colin's choice, 2026-11-10: one tap beats guaranteed links). Its
  * body is plain text, so links are clickable only where the agent's mail app
- * turns them into links (most phones; desktop Outlook often doesn't). The
- * note under it links the formatted version, with real links, as a backup.
+ * turns them into links (most phones; desktop Outlook often doesn't). Colin
+ * chose this over a copy-and-paste formatted version (no backup link).
  */
 function emailButton(ls: Listing[], lo: LoanOfficer, origin: string, label: string): string {
   return button(mailtoHref(agentEmailAddress(ls), agentEmailSubject(ls), agentEmailBody(ls, lo, origin)), label, true);
 }
 
-function emailNote(ls: Listing[], origin: string, what: string): string {
+function emailNote(ls: Listing[], what: string): string {
   const email = agentEmailAddress(ls);
   const who = esc(firstName(ls[0].agent.name) ?? "the agent");
-  const backup = `${origin}${agentEmailPagePath(ls)}`;
   return `Opens an email to ${email ? esc(email) : who} in your mail app with ${what}. Just hit send.${
     email ? "" : ` We don't have ${who}'s email address, so add it in the To line.`
-  } <a href="${esc(backup)}" target="_blank" style="color:#5b5b5b;text-decoration:underline">Links not clickable for ${who}? Send the formatted version.</a>`;
+  }`;
 }
 
 function kitCard(l: Listing, lo: LoanOfficer, origin: string): string {
   const kitUrl = `${origin}/l/${l.slug}`;
   const agentFirst = firstName(l.agent.name);
   const mailLabel = `Email kit to ${esc(agentFirst ?? "the agent")}`;
-  const mailNote = emailNote([l], origin, "the kit link");
+  const mailNote = emailNote([l], "the kit link");
   const facts = [formatPrice(l.price), statsLine(l)].filter(Boolean).join(" · ");
   const agent = [l.agent.name, l.agent.brokerage].filter(Boolean).join(", ");
   const photo = l.photos[0]
@@ -157,7 +156,7 @@ function agentGroupCard(ls: Listing[], lo: LoanOfficer, origin: string): string 
   const name = esc(agentFirst ?? "the agent");
   const email = agentEmailAddress(ls);
   const count = ls.length === 2 ? "both kits" : `all ${ls.length} kits`;
-  const mailNote = emailNote(ls, origin, `links to ${count}`);
+  const mailNote = emailNote(ls, `links to ${count}`);
   const agent = [a.name, a.brokerage].filter(Boolean).join(", ");
   return `
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e4e3e0;margin:0 0 20px">
