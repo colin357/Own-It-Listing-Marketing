@@ -71,19 +71,111 @@ export function agentEmailBody(l: Listing, lo: LoanOfficer | null, origin: strin
 }
 
 /**
+ * Plain-text body of one email to an agent with several new listings in the
+ * same batch: every kit's links first, then one how-to-use guide that covers
+ * them all. If the draft would get too long for a mailto: link (lots of
+ * listings), the guide is cut down to one line so every kit link still fits.
+ */
+export function agentGroupEmailBody(ls: Listing[], lo: LoanOfficer | null, origin: string): string {
+  if (ls.length === 1) return agentEmailBody(ls[0], lo, origin);
+  const who = firstName(ls[0].agent.name);
+  const anyNew = ls.some((l) => l.status === "just-listed");
+  const sellerCredit =
+    !!lo &&
+    ls.some(
+      (l) =>
+        l.status !== "just-sold" && l.status !== "under-contract" && !!programOptions({ ...l, concession: undefined }, lo),
+    );
+  const kits = (buyerLinks: boolean) =>
+    ls
+      .map(
+        (l, i) =>
+          `${i + 1}. ${streetLine(l)}\nKit: ${origin}/l/${l.slug}` +
+          (buyerLinks ? `\nBuyer page: ${origin}${buyerPagePath(l.slug)}` : ""),
+      )
+      .join("\n\n");
+  const missingPhotos = ls.filter((l) => !l.photos.length);
+  const steps = [
+    `Social posts: Save a post or story and share it on Instagram, Facebook or LinkedIn. Captions are written for you, just tap Copy.`,
+    `Flyers: Print the flyer for showings and open houses. The QR code takes buyers to the home's page.`,
+    `Buyer pages: Text or post the buyer page link for each home. Buyers see photos, details${lo?.showPayments === false ? "" : " and payments"}, and can call you for a tour in one tap.`,
+    ...(sellerCredit
+      ? [`Seller credit: If a seller will help with buyer costs, pick an option on that kit and every graphic and flyer updates to show the lower payment.`]
+      : []),
+    `Emails: Ready-to-send emails for your sphere and buyers are at the bottom of each kit.`,
+    `Download: Each kit has a Download all button to save everything at once.`,
+  ];
+  const build = (guide: string, buyerLinks = true) =>
+    [
+      `Hi${who ? ` ${who}` : ""},`,
+      anyNew
+        ? `Congrats on your new listings! I put together a free marketing kit for each of your ${ls.length} homes, made for that home and ready to post, print or send.`
+        : `I put together a free marketing kit for each of your ${ls.length} listings, made for that home and ready to post, print or send.`,
+      `YOUR KITS\n\n${kits(buyerLinks)}`,
+      ...(missingPhotos.length
+        ? [`We couldn't find listing photos for ${missingPhotos.map(streetLine).join(", ")} yet. Add them at the top of that kit and every graphic updates.`]
+        : []),
+      guide,
+      `Let me know if you'd like anything changed. And send any buyers with financing questions my way!`,
+    ].join("\n\n");
+  const short = `Each kit has social posts with captions, a printable flyer, a buyer page to text or post, and ready-to-send emails, plus a Download all button.`;
+  const tries = [
+    build(`HOW TO USE THEM\n\n${steps.map((t, i) => `${i + 1}. ${t}`).join("\n\n")}`),
+    build(short),
+    build(short, false),
+  ];
+  return tries.find((b) => encodedBodyLength(b) <= GROUP_BODY_MAX) ?? tries[tries.length - 1];
+}
+
+const encodedBodyLength = (body: string) => encodeURIComponent(body.replace(/\n/g, "\r\n")).length;
+
+/**
+ * Longest encoded multi-listing body before it's cut down. Some mail apps
+ * (Outlook for Windows) drop mailto: links much over 2,000 characters, and the
+ * address and subject take up to ~150 more.
+ */
+const GROUP_BODY_MAX = 1850;
+
+function mailtoHref(email: string, subject: string, body: string): { href: string; hasEmail: boolean } {
+  const hasEmail = EMAIL_RE.test(email);
+  // encodeURIComponent (not URLSearchParams) so spaces become %20, which every mail app reads.
+  const to = hasEmail ? encodeURIComponent(email).replace(/%40/g, "@") : "";
+  const href = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body.replace(/\n/g, "\r\n"))}`;
+  return { href, hasEmail };
+}
+
+/** The agent email address we'd send to: the first usable one across their listings. */
+function agentEmail(ls: Listing[]): string {
+  return ls.map((l) => l.agent.email?.trim() ?? "").find((e) => EMAIL_RE.test(e)) ?? "";
+}
+
+/**
  * A mailto: link that opens a ready-to-send email to the listing agent in the
  * loan officer's own mail app, so the agent sees it come from the loan officer.
  * When we don't have a usable agent email, the draft opens with an empty To line.
  */
 export function agentMailto(l: Listing, lo: LoanOfficer | null, origin: string): { href: string; hasEmail: boolean } {
-  const email = l.agent.email?.trim() ?? "";
-  const hasEmail = EMAIL_RE.test(email);
-  const subject = `Your marketing kit for ${streetLine(l)}`;
-  const body = agentEmailBody(l, lo, origin);
-  // encodeURIComponent (not URLSearchParams) so spaces become %20, which every mail app reads.
-  const to = hasEmail ? encodeURIComponent(email).replace(/%40/g, "@") : "";
-  const href = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body.replace(/\n/g, "\r\n"))}`;
-  return { href, hasEmail };
+  return mailtoHref(l.agent.email?.trim() ?? "", `Your marketing kit for ${streetLine(l)}`, agentEmailBody(l, lo, origin));
+}
+
+/** One mailto: draft to an agent covering all of their listings in this email. */
+export function agentGroupMailto(ls: Listing[], lo: LoanOfficer | null, origin: string): { href: string; hasEmail: boolean } {
+  if (ls.length === 1) return agentMailto(ls[0], lo, origin);
+  return mailtoHref(agentEmail(ls), `Marketing kits for your ${ls.length} listings`, agentGroupEmailBody(ls, lo, origin));
+}
+
+/**
+ * Listings grouped by listing agent (same name, or same email when there's no
+ * name), agents in alphabetical order and each agent's homes by address.
+ */
+export function groupByAgent(ls: Listing[]): Listing[][] {
+  const key = (l: Listing) =>
+    l.agent.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() || (l.agent.email ?? "").trim().toLowerCase() || l.slug;
+  const groups = new Map<string, Listing[]>();
+  for (const l of ls) groups.set(key(l), [...(groups.get(key(l)) ?? []), l]);
+  return [...groups.values()]
+    .map((g) => g.sort((a, b) => a.address.localeCompare(b.address)))
+    .sort((a, b) => a[0].agent.name.localeCompare(b[0].agent.name) || a[0].address.localeCompare(b[0].address));
 }
 
 /**
@@ -151,6 +243,67 @@ function kitCard(l: Listing, lo: LoanOfficer, origin: string): string {
 </table>`;
 }
 
+function groupAgentMessage(ls: Listing[], origin: string): string {
+  const who = firstName(ls[0].agent.name);
+  return `Hi${who ? ` ${who}` : ""}, congrats on your new listings! I put together a free marketing kit for each one: social posts, flyers, captions and emails, all ready to download.\n${ls
+    .map((l) => `${streetLine(l)}: ${origin}/l/${l.slug}`)
+    .join("\n")}`;
+}
+
+/** A listing inside an agent's group: photo, details and kit links, with no email button of its own. */
+function groupKitRow(l: Listing, origin: string, last: boolean): string {
+  const kitUrl = `${origin}/l/${l.slug}`;
+  const facts = [formatPrice(l.price), statsLine(l)].filter(Boolean).join(" · ");
+  const photo = l.photos[0]
+    ? `<img src="${esc(l.photos[0])}" width="496" alt="" style="display:block;width:100%;max-width:496px;height:auto;border:0" />`
+    : "";
+  return `<tr><td style="padding:0 20px ${last ? 20 : 18}px">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e4e3e0">
+      <tr><td>${photo}</td></tr>
+      <tr><td style="padding:14px 16px">
+        <p style="margin:0;font-size:17px;font-weight:700;color:#0a0a0a">${esc(streetLine(l))}, ${esc(l.city)}</p>
+        <p style="margin:4px 0 12px;font-size:14px;color:#5b5b5b">${esc(facts)}</p>
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+          <td valign="top" style="padding:0 8px 0 0">${button(kitUrl, "Open kit", false)}</td>
+          <td valign="top">${button(`${kitUrl}/download`, "Download all", false)}</td>
+        </tr></table>
+      </td></tr>
+    </table>
+  </td></tr>`;
+}
+
+/**
+ * An agent with two or more listings in this email: one card with one
+ * "Email all kits" button whose draft has every kit, then each home below it.
+ */
+function agentGroupCard(ls: Listing[], lo: LoanOfficer, origin: string): string {
+  const a = ls[0].agent;
+  const agentFirst = firstName(a.name);
+  const name = esc(agentFirst ?? "the agent");
+  const email = agentEmail(ls);
+  const mail = agentGroupMailto(ls, lo, origin);
+  const count = ls.length === 2 ? "both kits" : `all ${ls.length} kits`;
+  const mailNote = mail.hasEmail
+    ? `Opens one email to ${esc(email)} in your mail app with links to ${count}. Just hit send.`
+    : `Opens one email in your mail app with links to ${count}. We don't have ${name}'s email address, so add it in the To line.`;
+  const agent = [a.name, a.brokerage].filter(Boolean).join(", ");
+  return `
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e4e3e0;margin:0 0 20px">
+  <tr><td style="padding:18px 20px 16px">
+    <p style="margin:0;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#5b5b5b">${ls.length} new listings</p>
+    <p style="margin:4px 0 0;font-size:18px;font-weight:700;color:#0a0a0a">${esc(agent)}</p>
+    ${a.phone || email ? `<p style="margin:4px 0 0;font-size:14px;color:#5b5b5b">${[a.phone, email].filter(Boolean).map((x) => esc(x!)).join(" · ")}</p>` : ""}
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:14px 0 0">
+      <tr><td style="padding:0 0 6px">${button(mail.href, `Email ${count} to ${name}`, true)}</td></tr>
+      <tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.4;color:#5b5b5b">${mailNote}</td></tr>
+    </table>
+    <p style="margin:16px 0 4px;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#5b5b5b">Or copy and text to ${name}</p>
+    <p style="margin:0;padding:12px 14px;background:#f4f3f1;font-size:14px;line-height:1.5;color:#0a0a0a">${esc(groupAgentMessage(ls, origin)).replace(/\n/g, "<br>")}</p>
+  </td></tr>
+  ${ls.map((l, i) => groupKitRow(l, origin, i === ls.length - 1)).join("")}
+</table>`;
+}
+
 /**
  * Own It Social wordmark for the top of every email: live text in Arial Black,
  * not an image, so it shows even when the mail app blocks images.
@@ -170,9 +323,11 @@ export function renderDigest(lo: LoanOfficer, kits: Listing[], origin: string): 
     ${emailLogo()}
     <p style="margin:12px 0 0;text-align:center;font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#5b5b5b">Listing kits</p>
     <h1 style="margin:10px 0 0;font-size:26px;line-height:1.15;color:#0a0a0a">${n === 1 ? "A new listing kit is ready" : `${n} new listing kits are ready`}</h1>
-    <p style="margin:12px 0 0;font-size:15px;line-height:1.55;color:#0a0a0a">Hi ${esc(firstName(lo.name) ?? lo.name)}, ${n === 1 ? "one of your agents just listed a home" : `${n} of your agents' new listings came in`}. Each kit has social posts, flyers, captions and emails, ready to go. Tap <strong>Email kit</strong> under a listing to send it to the agent from your own email, or copy the message to text it.</p>
+    <p style="margin:12px 0 0;font-size:15px;line-height:1.55;color:#0a0a0a">Hi ${esc(firstName(lo.name) ?? lo.name)}, ${n === 1 ? "one of your agents just listed a home" : `${n} of your agents' new listings came in`}. Each kit has social posts, flyers, captions and emails, ready to go. Tap <strong>Email kit</strong> to send it to the agent from your own email, or copy the message to text it.${groupByAgent(kits).some((g) => g.length > 1) ? " An agent with more than one new listing has their homes together, and one email sends them all." : ""}</p>
   </td></tr>
-  <tr><td style="padding:20px 32px 8px">${kits.map((l) => kitCard(l, lo, origin)).join("")}</td></tr>
+  <tr><td style="padding:20px 32px 8px">${groupByAgent(kits)
+    .map((g) => (g.length > 1 ? agentGroupCard(g, lo, origin) : kitCard(g[0], lo, origin)))
+    .join("")}</td></tr>
   <tr><td style="padding:0 32px 28px">
     <p style="margin:0;font-size:12px;line-height:1.5;color:#5b5b5b">Payment estimates on the kits use the rates and disclosures set up for you. Reply to this email with any changes.</p>
   </td></tr>
@@ -246,7 +401,9 @@ export async function pendingDigests(
       skipped.push(`${lo.name} has no email address, so ${kits.length} kit(s) weren't emailed.`);
       continue;
     }
-    kits.sort((a, b) => a.listing.address.localeCompare(b.listing.address));
+    // Same order as the email: by agent, then address.
+    const order = groupByAgent(kits.map((k) => k.listing)).flat();
+    kits.sort((a, b) => order.indexOf(a.listing) - order.indexOf(b.listing));
     digests.push({ lo, kits, ...renderDigest(lo, kits.map((k) => k.listing), origin) });
   }
   digests.sort((a, b) => a.lo.name.localeCompare(b.lo.name));
