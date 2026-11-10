@@ -38,26 +38,11 @@ export default async function AccountPage({ params, searchParams }: PageProps<"/
           </div>
         ) : null}
 
-        {self ? (
-          <section className="acct-status">
-            <div>
-              <p className="site-label">Plan</p>
-              <p className="acct-plan">
-                Listing Kits · ${PLAN.priceUsd}/month
-              </p>
-              <p className={active ? "small" : "small acct-warn"}>{billingLabel(lo)}</p>
-            </div>
-            <Link className="pill pill-ghost" href={`/account/${slug}/${token}/billing`} prefetch={false}>
-              {active ? "Manage billing" : "Restart subscription"}
-            </Link>
-          </section>
-        ) : null}
-
         {!active ? (
           <div className="site-alert">
             <p>
               Your subscription isn&apos;t active, so we&apos;ve paused new kits. Kits you already have still work. Restart it
-              from Manage billing, or email <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
+              below under Plan, or email <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
             </p>
           </div>
         ) : null}
@@ -106,6 +91,21 @@ export default async function AccountPage({ params, searchParams }: PageProps<"/
                 </li>
               ))}
             </ul>
+          </section>
+        ) : null}
+
+        {self ? (
+          <section className="acct-status">
+            <div>
+              <p className="site-label">Plan</p>
+              <p className="acct-plan">
+                Listing Kits · ${PLAN.priceUsd}/month
+              </p>
+              <p className={active ? "small" : "small acct-warn"}>{billingLabel(lo)}</p>
+            </div>
+            <Link className="pill pill-ghost" href={`/account/${slug}/${token}/billing`} prefetch={false}>
+              {active ? "Manage billing" : "Restart subscription"}
+            </Link>
           </section>
         ) : null}
 
