@@ -6,14 +6,14 @@
 /* ---------- nav ---------- */
 .site-nav { background: var(--white); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 20; }
 .site-nav-inner { display: flex; align-items: center; gap: 16px; min-height: 72px; }
-.site-mark { white-space: nowrap; font-family: var(--display); font-weight: 900; text-transform: uppercase; letter-spacing: -0.03em; font-size: 1.45rem; line-height: 0.95; text-decoration: none; margin-right: auto; display: flex; flex-direction: column; }
-.site-mark small { font-family: var(--body); font-weight: 600; text-transform: none; letter-spacing: 0; font-size: 0.72rem; color: var(--muted); margin-top: 3px; }
+.site-mark { margin-right: auto; display: flex; align-items: center; text-decoration: none; }
+.site-mark img { display: block; height: 42px; width: auto; }
 .site-nav-links { display: flex; align-items: center; gap: 22px; }
 .site-navlink { white-space: nowrap; font-family: var(--display); font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.78rem; text-decoration: none; }
 .site-navlink:hover { color: var(--accent); }
 @media (max-width: 560px) {
   .site-nav-inner { min-height: 64px; }
-  .site-mark { font-size: 1.2rem; }
+  .site-mark img { height: 34px; }
   .site-nav-links { gap: 14px; }
   .site-nav-links .pill { padding: 10px 14px; font-size: 0.7rem; }
 }
