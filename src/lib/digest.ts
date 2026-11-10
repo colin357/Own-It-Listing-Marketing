@@ -26,11 +26,6 @@ export interface Digest {
   html: string;
 }
 
-/** Turn bare https links in already-escaped text into real links (desktop Outlook doesn't do it). */
-function linkify(escaped: string): string {
-  return escaped.replace(/https?:\/\/[^\s<]+/g, (u) => `<a href="${u}" target="_blank" style="color:#0a0a0a">${u}</a>`);
-}
-
 function agentMessage(l: Listing, kitUrl: string): string {
   const who = firstName(l.agent.name);
   return `Hi${who ? ` ${who}` : ""}, congrats on ${streetLine(l)}! I put together a free marketing kit for it: social posts, flyers, captions and emails, all ready to download. ${kitUrl}`;
@@ -44,8 +39,8 @@ function agentMessage(l: Listing, kitUrl: string): string {
 function button(href: string, label: string, primary: boolean): string {
   const bg = primary ? "#0a0a0a" : "#ffffff";
   const fg = primary ? "#ffffff" : "#0a0a0a";
-  // mailto: links open the mail app; target="_blank" makes some webmail open an empty tab too.
-  const target = href.startsWith("mailto:") ? "" : ' target="_blank"';
+  // mailto:/sms: links open an app; target="_blank" makes some webmail open an empty tab too.
+  const target = /^(mailto|sms):/.test(href) ? "" : ' target="_blank"';
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate"><tr>
       <td align="center" bgcolor="${bg}" style="background-color:${bg};border:2px solid #0a0a0a;border-radius:6px;mso-padding-alt:11px 20px">
         <a href="${esc(href)}"${target} style="display:inline-block;padding:11px 20px;color:${fg};font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:18px;font-weight:700;text-decoration:none;white-space:nowrap">${label}</a>
@@ -86,6 +81,40 @@ function emailNote(ls: Listing[], what: string): string {
   }`;
 }
 
+/**
+ * US phone as an sms: number (+1XXXXXXXXXX), or "" when we can't read it,
+ * so the text draft opens with an empty To line.
+ */
+function smsNumber(phone: string | undefined): string {
+  const d = (phone ?? "").replace(/\D/g, "");
+  if (d.length === 10) return `+1${d}`;
+  if (d.length === 11 && d.startsWith("1")) return `+${d}`;
+  return "";
+}
+
+/**
+ * The "Text kit" button: a one-tap text draft (sms: link) with the message
+ * filled in, on the loan officer's phone or computer (Messages on a Mac,
+ * Phone Link on Windows). "?&body=" is the form both iPhone and Android read.
+ */
+function textButton(phone: string | undefined, message: string, label: string): string {
+  return button(`sms:${smsNumber(phone)}?&body=${encodeURIComponent(message)}`, label, true);
+}
+
+function textNote(phone: string | undefined, who: string, what: string): string {
+  return smsNumber(phone)
+    ? `Opens a text to ${esc(phone!.trim())} with ${what}. Just hit send.`
+    : `Opens a text with ${what}. We don't have ${who}'s cell number, so add it in the To line.`;
+}
+
+/** Text button with its note under it. */
+function textRow(button: string, note: string): string {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:4px 0 0">
+      <tr><td style="padding:0 0 6px">${button}</td></tr>
+      <tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.4;color:#5b5b5b">${note}</td></tr>
+    </table>`;
+}
+
 function kitCard(l: Listing, lo: LoanOfficer, origin: string): string {
   const kitUrl = `${origin}/l/${l.slug}`;
   const agentFirst = firstName(l.agent.name);
@@ -107,12 +136,10 @@ function kitCard(l: Listing, lo: LoanOfficer, origin: string): string {
     <p style="margin:4px 0 0;font-size:14px;color:#5b5b5b">${esc(facts)}</p>
     <p style="margin:10px 0 0;font-size:14px;color:#0a0a0a">Listed by <strong>${esc(agent)}</strong>${l.agent.phone ? ` · ${esc(l.agent.phone)}` : ""}${l.agent.email ? ` · ${esc(l.agent.email)}` : ""}</p>
     ${noPhotos}
-    ${buttonRows(emailButton([l], lo, origin, mailLabel), mailNote, [
+    ${buttonRows(emailButton([l], lo, origin, mailLabel), mailNote + textRow(textButton(l.agent.phone, agentMessage(l, kitUrl), `Text kit to ${esc(agentFirst ?? "the agent")}`), textNote(l.agent.phone, esc(agentFirst ?? "the agent"), "the kit link")), [
       button(kitUrl, "Open kit", false),
       button(`${kitUrl}/download`, "Download all", false),
     ])}
-    <p style="margin:16px 0 4px;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#5b5b5b">Or copy and text to ${esc(agentFirst ?? "the agent")}</p>
-    <p style="margin:0;padding:12px 14px;background:#f4f3f1;font-size:14px;line-height:1.5;color:#0a0a0a">${linkify(esc(agentMessage(l, kitUrl)))}</p>
   </td></tr>
 </table>`;
 }
@@ -168,8 +195,7 @@ function agentGroupCard(ls: Listing[], lo: LoanOfficer, origin: string): string 
       <tr><td style="padding:0 0 6px">${emailButton(ls, lo, origin, `Email ${count} to ${name}`)}</td></tr>
       <tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.4;color:#5b5b5b">${mailNote}</td></tr>
     </table>
-    <p style="margin:16px 0 4px;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#5b5b5b">Or copy and text to ${name}</p>
-    <p style="margin:0;padding:12px 14px;background:#f4f3f1;font-size:14px;line-height:1.5;color:#0a0a0a">${linkify(esc(groupAgentMessage(ls, origin))).replace(/\n/g, "<br>")}</p>
+    ${textRow(textButton(a.phone, groupAgentMessage(ls, origin), `Text ${count} to ${name}`), textNote(a.phone, name, `links to ${count}`))}
   </td></tr>
   ${ls.map((l, i) => groupKitRow(l, origin, i === ls.length - 1)).join("")}
 </table>`;
@@ -194,7 +220,7 @@ export function renderDigest(lo: LoanOfficer, kits: Listing[], origin: string): 
     ${emailLogo()}
     <p style="margin:12px 0 0;text-align:center;font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#5b5b5b">Listing kits</p>
     <h1 style="margin:10px 0 0;font-size:26px;line-height:1.15;color:#0a0a0a">${n === 1 ? "A new listing kit is ready" : `${n} new listing kits are ready`}</h1>
-    <p style="margin:12px 0 0;font-size:15px;line-height:1.55;color:#0a0a0a">Hi ${esc(firstName(lo.name) ?? lo.name)}, ${n === 1 ? "one of your agents just listed a home" : `${n} of your agents' new listings came in`}. Each kit has social posts, flyers, captions and emails, ready to go. Tap <strong>Email kit</strong> to send it to the agent from your own email, or copy the message to text it.${groupByAgent(kits).some((g) => g.length > 1) ? " An agent with more than one new listing has their homes together, and one email sends them all." : ""}</p>
+    <p style="margin:12px 0 0;font-size:15px;line-height:1.55;color:#0a0a0a">Hi ${esc(firstName(lo.name) ?? lo.name)}, ${n === 1 ? "one of your agents just listed a home" : `${n} of your agents' new listings came in`}. Each kit has social posts, flyers, captions and emails, ready to go. Tap <strong>Email kit</strong> or <strong>Text kit</strong> to send it to the agent from your own email or phone.${groupByAgent(kits).some((g) => g.length > 1) ? " An agent with more than one new listing has their homes together, and one email or text sends them all." : ""}</p>
   </td></tr>
   <tr><td style="padding:20px 32px 8px">${groupByAgent(kits)
     .map((g) => (g.length > 1 ? agentGroupCard(g, lo, origin) : kitCard(g[0], lo, origin)))
