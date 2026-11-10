@@ -140,3 +140,9 @@
 .acct-kits a:hover strong { text-decoration: underline; }
 .acct-keep { margin-top: 40px; }
 .login-form { max-width: 460px; }
+
+/* Privacy policy and other plain legal pages */
+.legal h2 { font-size: 20px; font-weight: 700; margin: 40px 0 12px; }
+.legal p, .legal li { line-height: 1.65; }
+.legal ul { padding-left: 22px; display: grid; gap: 8px; margin: 0 0 16px; }
+.legal a { text-decoration: underline; }
