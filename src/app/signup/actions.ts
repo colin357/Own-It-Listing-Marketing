@@ -1,5 +1,6 @@
 "use server";
 
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { siteUrl } from "@/lib/site";
 import { createCheckout, findByEmail, sendAccountLink, stripeConfigured, type SignupInput } from "@/lib/billing";
@@ -44,10 +45,22 @@ export async function signupAction(_prev: SignupState, fd: FormData): Promise<Si
   };
   let url: string;
   try {
-    url = await createCheckout(input, site);
+    url = await createCheckout(input, site, undefined, undefined, await metaClick());
   } catch (err) {
     console.error("Checkout failed", err);
     return { issues: ["We couldn't open the payment page. Try again in a minute."], values };
   }
   redirect(url);
+}
+
+/** Meta ad-click cookies and browser details, so the trial can be credited to the ad that brought them. */
+async function metaClick() {
+  const c = await cookies();
+  const h = await headers();
+  return {
+    fbp: c.get("_fbp")?.value,
+    fbc: c.get("_fbc")?.value,
+    ip: h.get("x-forwarded-for")?.split(",")[0]?.trim() || undefined,
+    ua: h.get("user-agent") ?? undefined,
+  };
 }
