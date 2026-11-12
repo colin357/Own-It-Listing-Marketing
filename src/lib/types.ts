@@ -113,6 +113,8 @@ export interface ListingSource {
   id: string;
   mlsNumber?: string;
   mlsName?: string;
+  /** Set when the 90-days-on-market pull found it. */
+  pull?: "90-days";
   detectedAt: string;
 }
 

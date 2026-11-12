@@ -75,7 +75,8 @@ export default async function DetectionsPage({ searchParams }: PageProps<"/admin
         {run ? (
           <>
             {" "}
-            · Last run {new Date(run.finishedAt).toLocaleString("en-US")}: {run.listingsScanned} scanned, {run.matches} matched,{" "}
+            · Last run {new Date(run.finishedAt).toLocaleString("en-US")}: {run.listingsScanned} scanned, {run.matches} matched
+            {run.agedMatches ? ` (${run.agedMatches} at 90 days on market)` : ""},{" "}
             {run.created} kits, {run.requests} feed requests
             {run.repeatsSkipped ? `, ${run.repeatsSkipped} repeat homes skipped` : ""}
             {run.errors.length ? `, ${run.errors.length} errors` : ""}

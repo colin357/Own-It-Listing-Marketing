@@ -82,7 +82,7 @@ function emailParts(ls: Listing[], lo: LoanOfficer | null, origin: string): Part
     hi,
     {
       kind: "p",
-      text: ls.some((l) => l.status === "just-listed")
+      text: ls.every((l) => l.status === "just-listed")
         ? `Congrats on your new listings! I put together a free marketing kit for each of your ${ls.length} homes, made for that home and ready to post, print or send.`
         : `I put together a free marketing kit for each of your ${ls.length} listings, made for that home and ready to post, print or send.`,
     },

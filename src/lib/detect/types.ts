@@ -1,3 +1,5 @@
+import type { ListingStatus } from "../types";
+
 /**
  * New-listing detection: every day we pull fresh listings around each loan
  * officer's metro from a data provider, match the listing agents against our
@@ -57,6 +59,14 @@ export interface SourceListing {
   mlsNumber?: string;
   mlsName?: string;
   listedDate?: string;
+  /** Days the listing has been active, from the feed. */
+  daysOnMarket?: number;
+  /**
+   * Which Monday/Thursday pull found it: new listings (unset) or homes that just
+   * passed 90 days on market. The same home in the two pulls is two different
+   * kits, so dedupe.ts never treats one as a repeat of the other.
+   */
+  pull?: "90-days";
   photos: string[];
   description?: string;
   /** New-construction community or subdivision, typed in by the LO. */
@@ -71,8 +81,15 @@ export interface SourceListing {
 
 export interface ListingProvider {
   name: string;
-  /** Active listings within the metro listed in the last `days` days. */
-  fetchNewListings(metro: Metro, days: number): Promise<{ listings: SourceListing[]; requests: number }>;
+  /**
+   * Active listings within the metro listed in the last `days` days, or, with
+   * `minDays`, listed between `minDays` and `days` days ago.
+   */
+  fetchNewListings(
+    metro: Metro,
+    days: number,
+    minDays?: number,
+  ): Promise<{ listings: SourceListing[]; requests: number }>;
 }
 
 export type DetectionStatus =
@@ -97,6 +114,8 @@ export interface Detection {
   /** Set once the loan officer record is found. */
   loanOfficerSlug?: string;
   listing: SourceListing;
+  /** What the kit says (e.g. "Featured Listing" for a 90-day home); "Just Listed" when unset. */
+  kitStatus?: ListingStatus;
   /** Kit slug once created. */
   listingSlug?: string;
   /** When the loan officer was emailed this kit. */
@@ -129,6 +148,8 @@ export interface DetectionRun {
   photosQueued?: number;
   /** Listings skipped because they're a home we already have under another feed id (dedupe.ts). */
   repeatsSkipped?: number;
+  /** Matches from the 90-days-on-market pull (included in `matches`). */
+  agedMatches?: number;
   /** Loan officers emailed their new kits. */
   emailsSent?: number;
   review: number;

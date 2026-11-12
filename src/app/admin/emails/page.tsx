@@ -12,6 +12,7 @@ export default async function EmailsPage({ searchParams }: { searchParams: Promi
   const { digests, skipped, repeats, noPhotos } = await pendingDigests(await siteUrl());
   const ready = mailConfigured();
   const total = digests.reduce((n, d) => n + d.kits.length, 0);
+  const los = new Set(digests.map((d) => d.lo.slug)).size;
 
   return (
     <>
@@ -39,7 +40,7 @@ export default async function EmailsPage({ searchParams }: { searchParams: Promi
         At 7 AM Eastern on any day with new kits (after the listing photos have loaded), every loan officer gets one email
         with the kits created for their agents since their last email. Sending from: <strong>{ready ? process.env.MAIL_FROM : "not set up yet"}</strong>.{" "}
         {digests.length
-          ? `${total} kit${total === 1 ? "" : "s"} waiting for ${digests.length} loan officer${digests.length === 1 ? "" : "s"}.`
+          ? `${total} kit${total === 1 ? "" : "s"} waiting for ${los} loan officer${los === 1 ? "" : "s"} (${digests.length} email${digests.length === 1 ? "" : "s"}).`
           : "Nothing waiting to send, so a test email uses the newest kits."}
       </p>
       {!ready ? (
@@ -70,7 +71,7 @@ export default async function EmailsPage({ searchParams }: { searchParams: Promi
         </div>
       ) : null}
       {digests.map((d) => (
-        <details key={d.lo.slug} className="digest">
+        <details key={`${d.lo.slug}-${d.subject}`} className="digest">
           <summary>
             <strong>{d.lo.name}</strong> · {d.lo.email} · {d.subject}
           </summary>
