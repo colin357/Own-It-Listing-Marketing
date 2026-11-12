@@ -114,7 +114,7 @@ function sendNote(ls: Listing[], what: string): string {
   }`;
 }
 
-function kitCard(l: Listing, lo: LoanOfficer, origin: string): string {
+export function kitCard(l: Listing, lo: LoanOfficer, origin: string): string {
   const kitUrl = `${origin}/l/${l.slug}`;
   const facts = [formatPrice(l.price), statsLine(l)].filter(Boolean).join(" · ");
   const agent = [l.agent.name, l.agent.brokerage].filter(Boolean).join(", ");

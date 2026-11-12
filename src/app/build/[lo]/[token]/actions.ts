@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { countToday, loanOfficers, uncountToday } from "@/lib/store";
 import { isActive } from "@/lib/plan";
 import { validLoToken } from "@/lib/loLinks";
@@ -10,6 +11,8 @@ import { homeAddress } from "@/lib/detect/dedupe";
 import { buildKitForLo, existingKit } from "@/lib/detect/build";
 import type { SourceListing } from "@/lib/detect/types";
 import { UnreadableAddressError } from "@/lib/detect/providers/rentcast";
+import { sendBuiltKitEmail } from "@/lib/builtKitEmail";
+import { siteUrl } from "@/lib/site";
 
 /** Live address lookups per loan officer per day, to protect the RentCast quota. */
 const ADDRESS_LOOKUPS_PER_DAY = 25;
@@ -180,7 +183,15 @@ export async function buildKitAction(slug: string, token: string, _prev: BuildSt
   }
   let kitSlug: string;
   try {
-    kitSlug = (await buildKitForLo(lo, listing)).slug;
+    const started = new Date().toISOString();
+    const kit = await buildKitForLo(lo, listing);
+    kitSlug = kit.slug;
+    // A new kit (not one the LO already had): email it to them, after the page
+    // redirects so the build doesn't wait on the mail server.
+    if (kit.createdAt >= started) {
+      const origin = await siteUrl();
+      after(() => sendBuiltKitEmail(lo, kit, origin));
+    }
   } catch (err) {
     console.error("Kit build failed", err);
     return { error: `We couldn't build the kit: ${(err as Error).message}` };
