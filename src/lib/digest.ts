@@ -223,8 +223,10 @@ export function renderDigest(lo: LoanOfficer, kits: Listing[], origin: string): 
   const neu = aged ? "" : "new ";
   const subject =
     n === 1
-      ? `${aged ? "Listing kit (90 days on market)" : "New listing kit"}: ${streetLine(kits[0])}`
-      : `${n} ${neu}listing kits for your agents`;
+      ? `${aged ? "Just passed 90 days on market" : "New listing kit"}: ${streetLine(kits[0])}`
+      : aged === n
+        ? `${n} listings just passed 90 days on market`
+        : `${n} ${neu}listing kits for your agents`;
   const intro =
     aged === 0
       ? n === 1
@@ -322,9 +324,13 @@ export async function pendingDigests(
       continue;
     }
     // Same order as the email: by agent, then address.
-    const order = groupByAgent(kits.map((k) => k.listing)).flat();
-    kits.sort((a, b) => order.indexOf(a.listing) - order.indexOf(b.listing));
-    digests.push({ lo, kits, ...renderDigest(lo, kits.map((k) => k.listing), origin) });
+    // New listings and 90-days-on-market homes go out as two separate emails.
+    for (const part of [kits.filter((k) => !isNinetyDayKit(k.listing)), kits.filter((k) => isNinetyDayKit(k.listing))]) {
+      if (!part.length) continue;
+      const order = groupByAgent(part.map((k) => k.listing)).flat();
+      part.sort((a, b) => order.indexOf(a.listing) - order.indexOf(b.listing));
+      digests.push({ lo, kits: part, ...renderDigest(lo, part.map((k) => k.listing), origin) });
+    }
   }
   digests.sort((a, b) => a.lo.name.localeCompare(b.lo.name));
   noPhotos.sort((a, b) => a.loName.localeCompare(b.loName) || a.listing.address.localeCompare(b.listing.address));
