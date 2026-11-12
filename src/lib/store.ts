@@ -27,6 +27,9 @@ const redis = redisUrl && redisToken ? new Redis({ url: redisUrl, token: redisTo
 
 export const storageMode = redis ? "redis" : "files";
 
+/** Keys per MGET when listing a collection (~a few KB each, so well under Upstash's 10 MB request cap). */
+const LIST_CHUNK = 200;
+
 function redisCollection<T extends { slug: string; createdAt: string }>(prefix: string): Collection<T> {
   const r = redis!;
   const key = (slug: string) => `${prefix}:${slug}`;
@@ -38,7 +41,15 @@ function redisCollection<T extends { slug: string; createdAt: string }>(prefix: 
     async list() {
       const slugs = await r.zrange<string[]>(index, 0, -1, { rev: true });
       if (!slugs.length) return [];
-      const items = await r.mget<(T | null)[]>(...slugs.map(key));
+      // Upstash caps one request at 10 MB, and a single MGET of every
+      // detection passed that on Nov 12, 2026 (admin pages 500'd). Read in
+      // chunks, one after another: the client auto-pipelines concurrent
+      // commands into one request, so running chunks in parallel would
+      // put them back into a single oversized call.
+      const items: (T | null)[] = [];
+      for (let i = 0; i < slugs.length; i += LIST_CHUNK) {
+        items.push(...(await r.mget<(T | null)[]>(...slugs.slice(i, i + LIST_CHUNK).map(key))));
+      }
       return items.filter((x): x is T => !!x);
     },
     async save(item) {
