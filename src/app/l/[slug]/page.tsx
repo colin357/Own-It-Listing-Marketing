@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { loHeadshotSrc } from "@/lib/headshotCrop";
 import type { CSSProperties } from "react";
 import { notFound } from "next/navigation";
 import { getKit } from "@/lib/listings";
@@ -40,7 +41,7 @@ export async function generateMetadata({ params }: PageProps<"/l/[slug]">): Prom
   const { listing: l, lo } = kit;
   const title = `${statusLabel(l)}: ${streetLine(l)} – Marketing Kit`;
   const description = `Co-branded social posts, flyers and captions for ${streetLine(l)}, ${l.city}. Courtesy of ${lo.name}, ${lo.company}.`;
-  const image = assetUrl(l.slug, "landscape.png", assetVersion(l));
+  const image = assetUrl(l.slug, "landscape.png", assetVersion(l, lo));
   return {
     title,
     description,
@@ -67,7 +68,7 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
   const emails = buildEmails(l, lo, buyerUrl);
   const pay = paymentInfo(l, lo);
   const oh = formatOpenHouse(l);
-  const v = assetVersion(l);
+  const v = assetVersion(l, lo);
   const order = assetsFor(l, lo);
   const agentFirst = firstName(l.agent.name) ?? "you";
   const loFirst = lo.name.split(" ")[0];
@@ -162,7 +163,7 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
         <a className="chip" href="#contact">
           {lo.headshotUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={lo.headshotUrl} alt="" />
+            <img src={loHeadshotSrc(lo)} alt="" />
           ) : null}
           <span>
             <strong>From {lo.name}</strong>
@@ -384,7 +385,7 @@ export default async function ListingKitPage({ params }: PageProps<"/l/[slug]">)
           <div className="partner-card">
             {lo.headshotUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={lo.headshotUrl} alt={lo.name} className="partner-photo" />
+              <img src={loHeadshotSrc(lo)} alt={lo.name} className="partner-photo" />
             ) : null}
             <div>
               <p className="eyebrow">Your lending partner</p>

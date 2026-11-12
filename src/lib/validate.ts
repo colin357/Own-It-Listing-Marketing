@@ -1,7 +1,8 @@
-import type { Agent, BuydownType, Concession, Financing, Listing, ListingStatus, LoanOfficer, OpenHouse, PaymentSettings } from "./types";
+import type { Agent, BuydownType, Concession, Financing, Listing, ListingStatus, LoanOfficer, OpenHouse, PaymentSettings, HeadshotCrop } from "./types";
 import { BUYDOWN_TYPES, LISTING_STATUSES } from "./types";
 import { closingCostCredit, offeredBuydowns } from "./concessions";
 import { slugify } from "./format";
+import { isDefaultCrop, MAX_ZOOM, MIN_ZOOM } from "./headshotCrop";
 
 /**
  * Input normalization shared by the JSON API (Zapier / Make / CRM webhooks)
@@ -247,6 +248,7 @@ export function parseLoanOfficerInput(raw: Raw, existing?: LoanOfficer): LoanOff
     email: str(raw.email),
     applyUrl: url(raw.applyUrl, "applyUrl", issues),
     headshotUrl: url(raw.headshotUrl, "headshotUrl", issues),
+    headshotCrop: undefined,
     logoUrl: url(raw.logoUrl, "logoUrl", issues),
     brandColor: hex(raw.brandColor),
     accentColor: hex(raw.accentColor),
@@ -259,10 +261,34 @@ export function parseLoanOfficerInput(raw: Raw, existing?: LoanOfficer): LoanOff
     updatedAt: now,
   };
 
+  lo.headshotCrop = parseHeadshotCrop(raw, existing, lo.headshotUrl);
+  if (!lo.headshotCrop) delete lo.headshotCrop;
+
   if (!lo.name) issues.push("name is required");
   if (!lo.slug) issues.push("slug could not be derived from name");
   if (!lo.nmls) issues.push("nmls is required");
   if (!lo.company) issues.push("company is required");
   if (issues.length) throw new ValidationError(issues);
   return lo;
+}
+
+/**
+ * The admin form sends headshotCropX/Y/Zoom; the API may send headshotCrop.
+ * When neither is sent, keep the saved crop unless the headshot itself changed.
+ */
+function parseHeadshotCrop(raw: Raw, existing: LoanOfficer | undefined, headshotUrl: string | undefined): HeadshotCrop | undefined {
+  if (!headshotUrl) return undefined;
+  const obj = raw.headshotCrop && typeof raw.headshotCrop === "object" ? (raw.headshotCrop as Raw) : undefined;
+  const x = num(raw.headshotCropX ?? obj?.x);
+  const y = num(raw.headshotCropY ?? obj?.y);
+  const zoom = num(raw.headshotCropZoom ?? obj?.zoom);
+  if (x != null && y != null && zoom != null) {
+    const crop = {
+      x: Math.min(1, Math.max(0, x)),
+      y: Math.min(1, Math.max(0, y)),
+      zoom: Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom)),
+    };
+    return isDefaultCrop(crop) ? undefined : crop;
+  }
+  return existing?.headshotUrl === headshotUrl ? existing.headshotCrop : undefined;
 }

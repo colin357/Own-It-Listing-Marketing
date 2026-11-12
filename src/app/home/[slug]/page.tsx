@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { loHeadshotSrc } from "@/lib/headshotCrop";
 import { notFound } from "next/navigation";
 import { getKit } from "@/lib/listings";
 import {
@@ -189,7 +190,7 @@ export default async function BuyerPage({ params }: PageProps<"/home/[slug]">) {
               <div className="bp-lender">
                 {lo.headshotUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={lo.headshotUrl} alt={lo.name} className="bp-agent-photo" />
+                  <img src={loHeadshotSrc(lo)} alt={lo.name} className="bp-agent-photo" />
                 ) : null}
                 <div>
                   <p className="label">Questions about financing?</p>

@@ -3,7 +3,7 @@ import { ImageResponse } from "next/og";
 import type { Listing, LoanOfficer } from "../types";
 import { graphicColors } from "../format";
 import { paymentOptions, programOptions } from "../mortgage";
-import { inlineImage, loadFonts, qrDataUrl } from "./resources";
+import { inlineHeadshot, inlineImage, loadFonts, qrDataUrl } from "./resources";
 import { ASSETS, type AssetName, type RenderData } from "./templates";
 
 async function buildRenderData(
@@ -15,7 +15,7 @@ async function buildRenderData(
   const [photos, loHeadshot, agentHeadshot, logo, applyQr, listingQr] = await Promise.all([
     // Fetch a couple of spares so a broken URL doesn't leave a slot empty.
     Promise.all(listing.photos.slice(0, 6).map((url) => inlineImage(url))),
-    inlineImage(lo.headshotUrl, 400),
+    inlineHeadshot(lo.headshotUrl, lo.headshotCrop),
     inlineImage(listing.agent.headshotUrl, 400),
     inlineImage(lo.logoUrl, 600),
     lo.applyUrl ? qrDataUrl(lo.applyUrl) : null,

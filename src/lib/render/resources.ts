@@ -3,6 +3,8 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import QRCode from "qrcode";
 import sharp from "sharp";
+import { cropRect, isDefaultCrop } from "../headshotCrop";
+import type { HeadshotCrop } from "../types";
 
 type Font = { name: string; data: Buffer; weight: 400 | 500 | 600 | 700 | 800 | 900; style: "normal" };
 
@@ -58,4 +60,42 @@ export async function inlineImage(url: string | undefined, maxSize = 1600): Prom
 
 export async function qrDataUrl(text: string, color = "#111111"): Promise<string> {
   return QRCode.toDataURL(text, { margin: 1, width: 360, color: { dark: color, light: "#ffffff" } });
+}
+
+/**
+ * A headshot cut to the square chosen in admin, as a JPEG. `null` when the
+ * image can't be fetched or read.
+ */
+export async function croppedHeadshot(url: string, crop: HeadshotCrop, size = 400): Promise<Buffer | null> {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return null;
+    // Apply EXIF rotation first so the crop matches what the admin preview showed.
+    const { data, info } = await sharp(Buffer.from(await res.arrayBuffer()), { failOn: "none" })
+      .rotate()
+      .toBuffer({ resolveWithObject: true });
+    const r = cropRect(info.width, info.height, crop);
+    const box = {
+      left: Math.round(r.left),
+      top: Math.round(r.top),
+      width: Math.max(1, Math.min(Math.round(r.size), info.width - Math.round(r.left))),
+      height: Math.max(1, Math.min(Math.round(r.size), info.height - Math.round(r.top))),
+    };
+    return await sharp(data)
+      .extract(box)
+      .resize({ width: size, height: size, fit: "cover" })
+      .flatten({ background: "#ffffff" })
+      .jpeg({ quality: 86, mozjpeg: true })
+      .toBuffer();
+  } catch {
+    return null;
+  }
+}
+
+/** The loan officer's headshot for graphics: cropped when a crop was saved, else as uploaded. */
+export async function inlineHeadshot(url: string | undefined, crop: HeadshotCrop | undefined): Promise<string | null> {
+  if (!url) return null;
+  if (isDefaultCrop(crop)) return inlineImage(url, 400);
+  const out = await croppedHeadshot(url, crop!);
+  return out ? `data:image/jpeg;base64,${out.toString("base64")}` : inlineImage(url, 400);
 }
