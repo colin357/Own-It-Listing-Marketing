@@ -3,6 +3,7 @@ import { isActive } from "./plan";
 import { detections, listings, loanOfficers } from "./store";
 import { firstName, formatPrice, statsLine, streetLine } from "./format";
 import { agentEmailAddress, agentEmailBody, agentEmailSubject, groupByAgent, mailtoHref } from "./agentEmail";
+import { textPageHref } from "./textLink";
 import { mailConfigured, sendMail, type Mail } from "./mail";
 import type { Detection } from "./detect/types";
 import { sameHome } from "./detect/dedupe";
@@ -99,12 +100,13 @@ function smsNumber(phone: string | undefined): string {
 }
 
 /**
- * The "Text kit" button: a one-tap text draft (sms: link) with the message
- * filled in, on the loan officer's phone or computer (Messages on a Mac,
- * Phone Link on Windows). "?&body=" is the form both iPhone and Android read.
+ * The "Text kit" button: opens a text draft with the message filled in, on the
+ * loan officer's phone or computer (Messages on a Mac, Phone Link on Windows).
+ * It links to our /text page rather than straight to sms:, because Outlook on
+ * iPhone does nothing when an sms: link in an email is tapped (2026-11-12).
  */
-function textButton(phone: string | undefined, message: string, label: string): string {
-  return button(`sms:${smsNumber(phone)}?&body=${encodeURIComponent(message)}`, label, true);
+function textButton(phone: string | undefined, message: string, label: string, origin: string): string {
+  return button(textPageHref(origin, smsNumber(phone), message), label, true);
 }
 
 /**
@@ -146,7 +148,7 @@ export function kitCard(l: Listing, lo: LoanOfficer, origin: string): string {
     <p style="margin:4px 0 0;font-size:14px;color:#5b5b5b">${esc(facts)}</p>
     <p style="margin:10px 0 0;font-size:14px;color:#0a0a0a">Listed by <strong>${esc(agent)}</strong>${l.agent.phone ? ` · ${esc(l.agent.phone)}` : ""}${l.agent.email ? ` · ${esc(l.agent.email)}` : ""}</p>
     ${noPhotos}
-    ${buttonRows(sendButtons(emailButton([l], lo, origin, "Email kit"), textButton(l.agent.phone, agentMessage(l, kitUrl), "Text kit")), sendNote([l], "the kit link"), [
+    ${buttonRows(sendButtons(emailButton([l], lo, origin, "Email kit"), textButton(l.agent.phone, agentMessage(l, kitUrl), "Text kit", origin)), sendNote([l], "the kit link"), [
       button(kitUrl, "Open kit", false),
       button(`${kitUrl}/download`, "Download all", false),
     ])}
@@ -200,7 +202,7 @@ function agentGroupCard(ls: Listing[], lo: LoanOfficer, origin: string): string 
     <p style="margin:4px 0 0;font-size:18px;font-weight:700;color:#0a0a0a">${esc(agent)}</p>
     ${a.phone || email ? `<p style="margin:4px 0 0;font-size:14px;color:#5b5b5b">${[a.phone, email].filter(Boolean).map((x) => esc(x!)).join(" · ")}</p>` : ""}
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:14px 0 0">
-      <tr><td style="padding:0 0 6px">${sendButtons(emailButton(ls, lo, origin, "Email kits"), textButton(a.phone, groupAgentMessage(ls, origin), "Text kits"))}</td></tr>
+      <tr><td style="padding:0 0 6px">${sendButtons(emailButton(ls, lo, origin, "Email kits"), textButton(a.phone, groupAgentMessage(ls, origin), "Text kits", origin))}</td></tr>
       <tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.4;color:#5b5b5b">${sendNote(ls, `links to ${count}`)}</td></tr>
     </table>
   </td></tr>
