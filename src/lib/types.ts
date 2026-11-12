@@ -33,6 +33,13 @@ export interface PaymentSettings {
   termYears: number;
 }
 
+/** Square crop of a headshot: centre as a fraction of the image (0–1), zoom 1 = largest square that fits. */
+export interface HeadshotCrop {
+  x: number;
+  y: number;
+  zoom: number;
+}
+
 /** A client of ours. Every listing kit is co-branded with one loan officer. */
 export interface LoanOfficer {
   slug: string;
@@ -46,6 +53,8 @@ export interface LoanOfficer {
   /** Apply / pre-qualify link used for QR codes and CTAs. */
   applyUrl?: string;
   headshotUrl?: string;
+  /** How the headshot is framed in the circle on graphics and pages. Set in admin; absent = centred. */
+  headshotCrop?: HeadshotCrop;
   logoUrl?: string;
   /** Primary brand color (hex). */
   brandColor?: string;

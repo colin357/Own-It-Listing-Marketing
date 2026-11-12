@@ -16,6 +16,7 @@ import {
 } from "../format";
 import { paymentOptions, type PaymentOptions, type ProgramOptions } from "../mortgage";
 import { activeConcession, concessionSentence, concessionTag } from "../concessions";
+import { headshotKey } from "../headshotCrop";
 
 /**
  * Satori templates (rendered to PNG by next/og). Satori supports a subset of
@@ -33,14 +34,16 @@ import { activeConcession, concessionSentence, concessionTag } from "../concessi
 /** Bump when templates change so cached PNGs/PDFs are re-rendered. */
 export const TEMPLATE_VERSION = "8";
 
-/** Cache key for a listing's graphics: changes with the templates, the listing and the rates shown. */
-export function assetVersion(l: Listing): string {
+/** Cache key for a listing's graphics: changes with the templates, the listing, the rates shown and the LO's headshot crop. */
+export function assetVersion(l: Listing, lo?: Pick<LoanOfficer, "headshotUrl" | "headshotCrop">): string {
   const f = l.financing;
   const rates = f && l.showPayment ? [f.ratePct, f.aprPct, f.fhaRatePct, f.vaRatePct].join("_") : "none";
   const credit = l.concession ? `${l.concession.amount}${l.concession.type}` : "0";
   // A headshot saved on another of the agent's kits changes this kit's graphics too.
   const headshot = l.agent.headshotUrl ? shortHash(l.agent.headshotUrl) : "0";
-  return `${TEMPLATE_VERSION}-${l.updatedAt}-${rates}-${credit}-${headshot}`;
+  // Re-cropping the LO's headshot in admin changes every kit's graphics.
+  const loHeadshot = lo?.headshotCrop ? `-${headshotKey(lo)}` : "";
+  return `${TEMPLATE_VERSION}-${l.updatedAt}-${rates}-${credit}-${headshot}${loHeadshot}`;
 }
 
 function shortHash(s: string): string {

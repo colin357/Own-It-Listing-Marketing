@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { saveLoanOfficerAction, type FormState } from "@/app/admin/actions";
 import { Field, FormErrors, TextInput } from "./Field";
+import { HeadshotCropper } from "./HeadshotCropper";
 
 export function LoanOfficerForm({ slug, initial }: { slug: string | null; initial: Record<string, string> }) {
   const [state, action, pending] = useActionState<FormState, FormData>(saveLoanOfficerAction.bind(null, slug), {});
@@ -25,6 +26,7 @@ export function LoanOfficerForm({ slug, initial }: { slug: string | null; initia
           <TextInput label="Headshot URL" name="headshotUrl" values={v} type="url" />
           <TextInput label="Logo URL" name="logoUrl" values={v} type="url" hint="PNG or JPG. Shown on the flyer and kit page." />
         </div>
+        <HeadshotCropper initialUrl={v.headshotUrl ?? ""} initial={v} />
       </fieldset>
       <fieldset>
         <legend>Branding</legend>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { loHeadshotSrc } from "@/lib/headshotCrop";
 import { listings, loanOfficers } from "@/lib/store";
 import { accountPath, buildPath } from "@/lib/loLinks";
 import { billingLabel } from "@/lib/plan";
@@ -23,7 +24,7 @@ export default async function LoanOfficersPage() {
           <article key={lo.slug} className="lo-tile" style={{ borderTopColor: lo.brandColor || "#0f2a44" }}>
             {lo.headshotUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={lo.headshotUrl} alt="" />
+              <img src={loHeadshotSrc(lo)} alt="" />
             ) : null}
             <div>
               <strong>{lo.name}</strong>
