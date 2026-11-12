@@ -33,6 +33,8 @@ export function homeAddress(l: Pick<SourceListing, "address" | "unit" | "zip">):
  * they never count as the same home.
  */
 export function sameHome(a: SourceListing, b: SourceListing): boolean {
+  // A new-listing kit and a 90-days-on-market kit for one home are both wanted.
+  if ((a.pull ?? "new") !== (b.pull ?? "new")) return false;
   if (a.provider === b.provider && a.id === b.id) return true;
   if (a.mlsNumber && b.mlsNumber && normalizeMls(a.mlsNumber) === normalizeMls(b.mlsNumber)) return true;
   const x = homeAddress(a);

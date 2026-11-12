@@ -26,8 +26,22 @@ export interface Digest {
   html: string;
 }
 
+/** Kits from the 90-days-on-market pull: a fresh push for a home that's been for sale a while, not a new listing. */
+export function isNinetyDayKit(l: Listing): boolean {
+  return l.source?.pull === "90-days";
+}
+
+/** Small label over a 90-day kit in the email, so the LO knows it isn't a new listing. */
+function ninetyDayTag(l: Listing): string {
+  return isNinetyDayKit(l)
+    ? `<p style="margin:0 0 4px;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#8a5a00">90 days on market</p>`
+    : "";
+}
+
 function agentMessage(l: Listing, kitUrl: string): string {
   const who = firstName(l.agent.name);
+  if (isNinetyDayKit(l))
+    return `Hi${who ? ` ${who}` : ""}, I put together a free marketing kit to give ${streetLine(l)} a fresh push: social posts, flyers, captions and emails, all ready to download. ${kitUrl}`;
   return `Hi${who ? ` ${who}` : ""}, congrats on ${streetLine(l)}! I put together a free marketing kit for it: social posts, flyers, captions and emails, all ready to download. ${kitUrl}`;
 }
 
@@ -128,7 +142,7 @@ function kitCard(l: Listing, lo: LoanOfficer, origin: string): string {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e4e3e0;margin:0 0 20px">
   <tr><td>${photo}</td></tr>
   <tr><td style="padding:18px 20px">
-    <p style="margin:0;font-size:18px;font-weight:700;color:#0a0a0a">${esc(streetLine(l))}, ${esc(l.city)}</p>
+    ${ninetyDayTag(l)}<p style="margin:0;font-size:18px;font-weight:700;color:#0a0a0a">${esc(streetLine(l))}, ${esc(l.city)}</p>
     <p style="margin:4px 0 0;font-size:14px;color:#5b5b5b">${esc(facts)}</p>
     <p style="margin:10px 0 0;font-size:14px;color:#0a0a0a">Listed by <strong>${esc(agent)}</strong>${l.agent.phone ? ` · ${esc(l.agent.phone)}` : ""}${l.agent.email ? ` · ${esc(l.agent.email)}` : ""}</p>
     ${noPhotos}
@@ -142,7 +156,8 @@ function kitCard(l: Listing, lo: LoanOfficer, origin: string): string {
 
 function groupAgentMessage(ls: Listing[], origin: string): string {
   const who = firstName(ls[0].agent.name);
-  return `Hi${who ? ` ${who}` : ""}, congrats on your new listings! I put together a free marketing kit for each one: social posts, flyers, captions and emails, all ready to download.\n${ls
+  const opener = ls.some(isNinetyDayKit) ? "" : " congrats on your new listings!";
+  return `Hi${who ? ` ${who}` : ""},${opener} I put together a free marketing kit for each one: social posts, flyers, captions and emails, all ready to download.\n${ls
     .map((l) => `${streetLine(l)}: ${origin}/l/${l.slug}`)
     .join("\n")}`;
 }
@@ -158,7 +173,7 @@ function groupKitRow(l: Listing, origin: string, last: boolean): string {
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e4e3e0">
       <tr><td>${photo}</td></tr>
       <tr><td style="padding:14px 16px">
-        <p style="margin:0;font-size:17px;font-weight:700;color:#0a0a0a">${esc(streetLine(l))}, ${esc(l.city)}</p>
+        ${ninetyDayTag(l)}<p style="margin:0;font-size:17px;font-weight:700;color:#0a0a0a">${esc(streetLine(l))}, ${esc(l.city)}</p>
         <p style="margin:4px 0 12px;font-size:14px;color:#5b5b5b">${esc(facts)}</p>
         <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
           <td valign="top" style="padding:0 8px 0 0">${button(kitUrl, "Open kit", false)}</td>
@@ -181,7 +196,7 @@ function agentGroupCard(ls: Listing[], lo: LoanOfficer, origin: string): string 
   return `
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e4e3e0;margin:0 0 20px">
   <tr><td style="padding:18px 20px 16px">
-    <p style="margin:0;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#5b5b5b">${ls.length} new listings</p>
+    <p style="margin:0;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#5b5b5b">${ls.length} ${ls.some(isNinetyDayKit) ? "listings" : "new listings"}</p>
     <p style="margin:4px 0 0;font-size:18px;font-weight:700;color:#0a0a0a">${esc(agent)}</p>
     ${a.phone || email ? `<p style="margin:4px 0 0;font-size:14px;color:#5b5b5b">${[a.phone, email].filter(Boolean).map((x) => esc(x!)).join(" · ")}</p>` : ""}
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:14px 0 0">
@@ -203,7 +218,23 @@ export function emailLogo(): string {
 
 export function renderDigest(lo: LoanOfficer, kits: Listing[], origin: string): { subject: string; html: string } {
   const n = kits.length;
-  const subject = n === 1 ? `New listing kit: ${streetLine(kits[0])}` : `${n} new listing kits for your agents`;
+  // "New" only when every kit is a new listing; 90-day kits are for homes that have been for sale a while.
+  const aged = kits.filter(isNinetyDayKit).length;
+  const neu = aged ? "" : "new ";
+  const subject =
+    n === 1
+      ? `${aged ? "Listing kit (90 days on market)" : "New listing kit"}: ${streetLine(kits[0])}`
+      : `${n} ${neu}listing kits for your agents`;
+  const intro =
+    aged === 0
+      ? n === 1
+        ? "one of your agents just listed a home"
+        : `${n} of your agents' new listings came in`
+      : aged === n
+        ? n === 1
+          ? "one of your agents has a home that just passed 90 days on market, a good time for a fresh push"
+          : `${n} of your agents' homes just passed 90 days on market, a good time for a fresh push`
+        : `${n - aged} new ${n - aged === 1 ? "listing" : "listings"} came in, and ${aged} ${aged === 1 ? "home" : "homes"} just passed 90 days on market (marked below), a good time for a fresh push`;
   const html = `<!doctype html>
 <html><body style="margin:0;padding:0;background:#f4f3f1">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f3f1"><tr><td align="center" style="padding:28px 12px">
@@ -211,8 +242,8 @@ export function renderDigest(lo: LoanOfficer, kits: Listing[], origin: string): 
   <tr><td style="padding:28px 32px 8px">
     ${emailLogo()}
     <p style="margin:12px 0 0;text-align:center;font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#5b5b5b">Listing kits</p>
-    <h1 style="margin:10px 0 0;font-size:26px;line-height:1.15;color:#0a0a0a">${n === 1 ? "A new listing kit is ready" : `${n} new listing kits are ready`}</h1>
-    <p style="margin:12px 0 0;font-size:15px;line-height:1.55;color:#0a0a0a">Hi ${esc(firstName(lo.name) ?? lo.name)}, ${n === 1 ? "one of your agents just listed a home" : `${n} of your agents' new listings came in`}. Each kit has social posts, flyers, captions and emails, ready to go. Tap <strong>Email kit</strong> or <strong>Text kit</strong> to send it to the agent from your own email or phone.${groupByAgent(kits).some((g) => g.length > 1) ? " An agent with more than one new listing has their homes together, and one email or text sends them all." : ""}</p>
+    <h1 style="margin:10px 0 0;font-size:26px;line-height:1.15;color:#0a0a0a">${n === 1 ? `A ${neu}listing kit is ready` : `${n} ${neu}listing kits are ready`}</h1>
+    <p style="margin:12px 0 0;font-size:15px;line-height:1.55;color:#0a0a0a">Hi ${esc(firstName(lo.name) ?? lo.name)}, ${intro}. Each kit has social posts, flyers, captions and emails, ready to go. Tap <strong>Email kit</strong> or <strong>Text kit</strong> to send it to the agent from your own email or phone.${groupByAgent(kits).some((g) => g.length > 1) ? " When an agent has more than one home here, they're grouped together, and one email or text sends them all." : ""}</p>
   </td></tr>
   <tr><td style="padding:20px 32px 8px">${groupByAgent(kits)
     .map((g) => (g.length > 1 ? agentGroupCard(g, lo, origin) : kitCard(g[0], lo, origin)))

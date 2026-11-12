@@ -39,6 +39,7 @@ interface RentcastListing {
   price?: number;
   listingType?: string;
   listedDate?: string;
+  daysOnMarket?: number;
   mlsName?: string;
   mlsNumber?: string;
   listingAgent?: RentcastContact;
@@ -78,6 +79,7 @@ export function fromRentcast(r: RentcastListing, { needAgent = true } = {}): Sou
     mlsNumber: r.mlsNumber,
     mlsName: r.mlsName,
     listedDate: r.listedDate,
+    daysOnMarket: r.daysOnMarket,
     photos: [],
     agent: { name: r.listingAgent?.name ?? "", ...pickContact(r.listingAgent ?? {}) },
     office: r.listingOffice?.name ? { name: r.listingOffice.name, ...pickContact(r.listingOffice) } : undefined,
@@ -115,7 +117,7 @@ async function fetchWithRetry(url: string, apiKey: string): Promise<Response> {
 export function rentcastProvider(apiKey: string): ListingProvider {
   return {
     name: "rentcast",
-    async fetchNewListings(metro: Metro, days: number) {
+    async fetchNewListings(metro: Metro, days: number, minDays?: number) {
       const out: SourceListing[] = [];
       let requests = 0;
       for (let page = 0; page < MAX_PAGES; page++) {
@@ -124,8 +126,8 @@ export function rentcastProvider(apiKey: string): ListingProvider {
           longitude: String(metro.longitude),
           radius: String(metro.radiusMiles),
           status: "Active",
-          // Max days since listed (min 1).
-          daysOld: String(Math.max(1, days)),
+          // Max days since listed (min 1), or a "min:max" range.
+          daysOld: minDays ? `${Math.max(1, minDays)}:${Math.max(minDays, days)}` : String(Math.max(1, days)),
           limit: String(PAGE),
           offset: String(page * PAGE),
         });

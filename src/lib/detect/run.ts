@@ -46,7 +46,7 @@ function highlightsFor(l: SourceListing): string[] {
 export async function createKitFromDetection(
   det: Detection,
   lo: LoanOfficer,
-  status: ListingStatus = "just-listed",
+  status: ListingStatus = det.kitStatus ?? "just-listed",
 ): Promise<Listing> {
   const s = det.listing;
   const created = await createListing({
@@ -78,7 +78,14 @@ export async function createKitFromDetection(
   });
   const listing: Listing = {
     ...created,
-    source: { provider: s.provider, id: s.id, mlsNumber: s.mlsNumber, mlsName: s.mlsName, detectedAt: det.createdAt },
+    source: {
+      provider: s.provider,
+      id: s.id,
+      mlsNumber: s.mlsNumber,
+      mlsName: s.mlsName,
+      ...(s.pull ? { pull: s.pull } : {}),
+      detectedAt: det.createdAt,
+    },
     ...(s.builder ? { builder: s.builder } : {}),
   };
   await listings.save(listing);
@@ -142,6 +149,34 @@ const FEED_CONCURRENCY = 4;
 /** A listing counts as new for this many days after it first appears. */
 export const DEFAULT_DAYS = 7;
 
+/**
+ * The same runs also pull homes that just passed 90 days on market, listed
+ * 90 to 97 days ago. Runs are 3 or 4 days apart, so a home is usually in two
+ * runs' windows; its kit slug (`...-90d`) means it only gets one kit. The
+ * 8-day window leaves room for a missed run and for the feed running late.
+ */
+export const AGED_DAYS = { min: 90, max: 97 } as const;
+const AGED_SUFFIX = "-90d";
+
+/**
+ * What a 90-day kit says: "Price Improved" when we made a kit for this home
+ * before at a higher price, otherwise "Featured Listing" (never "Just Listed").
+ */
+function agedKitStatus(l: SourceListing, known: Detection[]): ListingStatus {
+  const earlier = known.find((d) => !d.listing.pull && sameHome(d.listing, { ...l, pull: undefined, price: d.listing.price }));
+  return earlier && l.price < earlier.listing.price ? "price-improved" : "featured";
+}
+
+/** Photos from an earlier kit for the same home, so a 90-day kit needn't wait for (or pay for) a Zillow lookup. */
+async function earlierPhotos(l: SourceListing, known: Detection[]) {
+  for (const d of known) {
+    if (d.listing.pull || !d.listingSlug || !sameHome(d.listing, { ...l, pull: undefined, price: d.listing.price })) continue;
+    const kit = await listings.get(d.listingSlug);
+    if (kit?.photos.length) return { photos: kit.photos, description: kit.description, listingUrl: kit.listingUrl };
+  }
+  return null;
+}
+
 export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin }: RunOptions) {
   const startMs = Date.now();
   const startedAt = new Date(startMs).toISOString();
@@ -174,21 +209,53 @@ export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin
 
   // A few metros at a time: one at a time takes minutes once there are many
   // metros, and RentCast is fine with a handful of requests in parallel.
-  const feeds: { listings: SourceListing[]; requests: number }[] = new Array(metros.length);
-  let next = 0;
-  await Promise.all(
-    Array.from({ length: Math.min(FEED_CONCURRENCY, metros.length) }, async () => {
-      while (next < metros.length) {
-        const i = next++;
-        try {
-          feeds[i] = await provider.fetchNewListings(metros[i], days);
-        } catch (err) {
-          errors.push((err as Error).message);
+  async function pull(maxDays: number, minDays?: number) {
+    const feeds: { listings: SourceListing[]; requests: number }[] = new Array(metros.length);
+    let next = 0;
+    await Promise.all(
+      Array.from({ length: Math.min(FEED_CONCURRENCY, metros.length) }, async () => {
+        while (next < metros.length) {
+          const i = next++;
+          try {
+            feeds[i] = await provider!.fetchNewListings(metros[i], maxDays, minDays);
+          } catch (err) {
+            errors.push(`${minDays ? `${minDays}-day pull: ` : ""}${(err as Error).message}`);
+          }
         }
+      }),
+    );
+    return feeds;
+  }
+  const newFeeds = await pull(days);
+  const agedFeeds = await pull(AGED_DAYS.max, AGED_DAYS.min);
+  const agedSeen = new Set<string>();
+  let agedMatches = 0;
+
+  for (const res of agedFeeds) {
+    if (!res) continue;
+    requests += res.requests;
+    for (const src of res.listings) {
+      if (agedSeen.has(src.id)) continue;
+      agedSeen.add(src.id);
+      scannedListings.push(src);
+      // Trust the feed's own count when it gives one, in case the range filter is loose.
+      if (src.daysOnMarket != null && (src.daysOnMarket < AGED_DAYS.min || src.daysOnMarket > AGED_DAYS.max)) continue;
+      scanned++;
+      const l: SourceListing = { ...src, pull: "90-days" };
+      const m = match(l);
+      if (!m) continue;
+      const slug = slugify(`${l.provider}-${l.id}`) + AGED_SUFFIX;
+      if (knownSlugs.has(slug)) continue;
+      if (findSameHome(l, known) || found.some((f) => sameHome(f.listing, l))) {
+        repeats++;
+        continue;
       }
-    }),
-  );
-  for (const res of feeds) {
+      found.push({ listing: l, match: m, slug });
+      agedMatches++;
+    }
+  }
+
+  for (const res of newFeeds) {
     if (!res) continue;
     requests += res.requests;
     for (const l of res.listings) {
@@ -225,6 +292,11 @@ export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin
   for (const f of found) {
     const loName = f.match.agent.loanOfficer;
     const lo = findLo(loName);
+    let listing = f.listing;
+    if (listing.pull && !listing.photos.length && !dryRun) {
+      const p = await earlierPhotos(listing, known).catch(() => null);
+      if (p) listing = { ...listing, ...p, description: listing.description ?? p.description, listingUrl: listing.listingUrl ?? p.listingUrl };
+    }
     const det: Detection = {
       slug: f.slug,
       status: f.match.confidence >= AUTO_CONFIDENCE ? (lo ? "created" : "waiting-lo") : "review",
@@ -233,7 +305,8 @@ export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin
       rosterAgent: f.match.agent,
       loanOfficerName: loName,
       loanOfficerSlug: lo?.slug,
-      listing: f.listing,
+      listing,
+      ...(listing.pull ? { kitStatus: agedKitStatus(listing, known) } : {}),
       createdAt: now,
       updatedAt: now,
     };
@@ -252,7 +325,7 @@ export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin
       }
       await detections.save(det);
       // Queue the photo lookup right away, so a run cut off part way still gets its photos.
-      if (photoSource()) await queuePhotos([det.slug]);
+      if (photoSource() && !listing.photos.length) await queuePhotos([det.slug]);
     }
     results.push(det);
   }
@@ -307,6 +380,7 @@ export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin
     requests,
     listingsScanned: scanned,
     matches: results.length,
+    agedMatches,
     created,
     photosAdded,
     photosQueued: queued,
