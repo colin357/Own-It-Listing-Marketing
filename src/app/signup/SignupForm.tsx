@@ -26,11 +26,9 @@ export function SignupForm({ trialDays, price }: { trialDays: number; price: num
       <div className="site-grid">
         {input("name", "Full name", { required: true, autoComplete: "name" })}
         {input("email", "Email", { required: true, type: "email", autoComplete: "email" })}
-        {input("phone", "Mobile phone", { type: "tel", autoComplete: "tel" })}
-        {input("title", "Title", { placeholder: "Senior Loan Officer" })}
+        {input("phone", "Mobile phone", { required: true, type: "tel", autoComplete: "tel" })}
         {input("company", "Company", { required: true, autoComplete: "organization" })}
         {input("nmls", "Your NMLS #", { required: true, inputMode: "numeric" })}
-        {input("companyNmls", "Company NMLS #", { inputMode: "numeric" })}
       </div>
       <div className="site-form-actions">
         <button className="pill pill-lg" type="submit" disabled={pending}>

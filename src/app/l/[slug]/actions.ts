@@ -8,11 +8,15 @@ import { getKit } from "@/lib/listings";
 import { programOptions } from "@/lib/mortgage";
 import { isUploadedHeadshot, saveHeadshot } from "@/lib/agentHeadshots";
 import type { Concession } from "@/lib/types";
+import { isDemo, saveDemoIncentive } from "@/lib/demo";
+
+const DEMO_NOTE = "This is a sample kit, so uploads are turned off.";
 
 const MAX_AGENT_PHOTOS = 30;
 
 /** Saves the agent's uploaded photos onto a kit that had none. */
 export async function addAgentPhotosAction(slug: string, urls: string[]): Promise<{ error?: string }> {
+  if (isDemo(slug)) return { error: DEMO_NOTE };
   const listing = await listings.get(slug);
   if (!listing) return { error: "Listing not found" };
   if (listing.photos.length) return { error: "This listing already has photos." };
@@ -38,6 +42,7 @@ export async function addAgentPhotosAction(slug: string, urls: string[]): Promis
  * kits (and future ones) use it too.
  */
 export async function saveAgentHeadshotAction(slug: string, url: string): Promise<{ error?: string }> {
+  if (isDemo(slug)) return { error: DEMO_NOTE };
   const listing = await listings.get(slug);
   if (!listing) return { error: "Listing not found" };
   if (!isUploadedHeadshot(url, slug)) return { error: "Upload didn't finish. Try again." };
@@ -50,6 +55,7 @@ export async function saveAgentHeadshotAction(slug: string, url: string): Promis
 
 /** Saves the seller incentive the agent picked on the kit page. "none" removes it. */
 export async function saveConcessionAction(slug: string, type: string): Promise<{ error?: string }> {
+  if (isDemo(slug)) return saveDemoIncentive(type);
   const listing = await listings.get(slug);
   if (!listing) return { error: "Listing not found" };
   if (listing.status === "just-sold" || listing.status === "under-contract")
