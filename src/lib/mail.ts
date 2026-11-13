@@ -31,6 +31,8 @@ async function graphToken(): Promise<string> {
 
 export interface Mail {
   to: string[];
+  /** Copied openly (CC), e.g. the loan officer's assistants. */
+  cc?: string[];
   subject: string;
   html: string;
   replyTo?: string;
@@ -72,6 +74,7 @@ async function sendOne(token: string, from: string, bcc: string[], m: Mail): Pro
         subject: m.subject,
         body: { contentType: "HTML", content: m.html },
         toRecipients: m.to.map(addr),
+        ccRecipients: (m.cc ?? []).map(addr),
         bccRecipients: bcc.map(addr),
         replyTo: m.replyTo ? [addr(m.replyTo)] : undefined,
       },

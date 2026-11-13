@@ -39,6 +39,27 @@ function list(v: unknown, splitUrls = false): string[] {
   return arr.map((x) => String(x).trim()).filter(Boolean);
 }
 
+const EMAIL_RE = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
+
+/** A list of email addresses typed with commas, semicolons, spaces or new lines. Bad ones go in issues. */
+function emails(v: unknown, field: string, issues: string[], exclude?: string): string[] {
+  if (v == null) return [];
+  const parts = (Array.isArray(v) ? v.map(String) : String(v).split(/[\s,;]+/))
+    .map((s) => s.trim().replace(/^<|>$/g, ""))
+    .filter(Boolean);
+  const out: string[] = [];
+  for (const p of parts) {
+    if (!EMAIL_RE.test(p)) {
+      issues.push(`${field}: "${p}" isn't an email address`);
+      continue;
+    }
+    const lower = p.toLowerCase();
+    if (lower === exclude?.toLowerCase() || out.some((o) => o.toLowerCase() === lower)) continue;
+    out.push(p);
+  }
+  return out;
+}
+
 function bool(v: unknown, fallback: boolean): boolean {
   if (v == null || v === "") return fallback;
   if (typeof v === "boolean") return v;
@@ -246,6 +267,7 @@ export function parseLoanOfficerInput(raw: Raw, existing?: LoanOfficer): LoanOff
     companyNmls: str(raw.companyNmls),
     phone: str(raw.phone),
     email: str(raw.email),
+    ccEmails: undefined,
     applyUrl: url(raw.applyUrl, "applyUrl", issues),
     headshotUrl: url(raw.headshotUrl, "headshotUrl", issues),
     headshotCrop: undefined,
@@ -260,6 +282,12 @@ export function parseLoanOfficerInput(raw: Raw, existing?: LoanOfficer): LoanOff
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };
+
+  // Absent from the input (an API call that doesn't mention it) keeps the saved list.
+  // An empty field clears it.
+  const ccRaw = "ccEmails" in raw ? raw.ccEmails : raw.cc;
+  lo.ccEmails = ccRaw === undefined ? existing?.ccEmails : emails(ccRaw, "CC emails", issues, lo.email);
+  if (!lo.ccEmails?.length) delete lo.ccEmails;
 
   lo.headshotCrop = parseHeadshotCrop(raw, existing, lo.headshotUrl);
   if (!lo.headshotCrop) delete lo.headshotCrop;

@@ -73,7 +73,7 @@ export default async function EmailsPage({ searchParams }: { searchParams: Promi
       {digests.map((d) => (
         <details key={`${d.lo.slug}-${d.subject}`} className="digest">
           <summary>
-            <strong>{d.lo.name}</strong> · {d.lo.email} · {d.subject}
+            <strong>{d.lo.name}</strong> · {d.lo.email}{d.lo.ccEmails?.length ? ` (cc ${d.lo.ccEmails.join(", ")})` : ""} · {d.subject}
           </summary>
           <iframe title={`Email to ${d.lo.name}`} srcDoc={d.html} style={{ width: "100%", height: 720, border: "1px solid var(--line)", background: "#fff" }} />
         </details>

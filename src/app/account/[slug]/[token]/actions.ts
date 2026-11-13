@@ -18,7 +18,7 @@ async function authorized(slug: string, token: string): Promise<LoanOfficer | nu
   return loanOfficers.get(slug);
 }
 
-const PROFILE_FIELDS = ["name", "title", "nmls", "company", "companyNmls", "phone", "email", "applyUrl"];
+const PROFILE_FIELDS = ["name", "title", "nmls", "company", "companyNmls", "phone", "email", "ccEmails", "applyUrl"];
 
 export async function saveProfileAction(slug: string, token: string, _prev: AccountFormState, fd: FormData): Promise<AccountFormState> {
   const values = Object.fromEntries(PROFILE_FIELDS.map((k) => [k, String(fd.get(k) ?? "").trim()]));

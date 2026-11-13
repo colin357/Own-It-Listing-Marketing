@@ -368,7 +368,7 @@ export async function sendDigests(origin: string): Promise<{ sent: number; error
   }
   let sent = 0;
   for (const d of digests) {
-    const mail: Mail = { to: [d.lo.email!], subject: d.subject, html: d.html };
+    const mail: Mail = { to: [d.lo.email!], cc: d.lo.ccEmails, subject: d.subject, html: d.html };
     const failed = await sendMail([mail]);
     // A timeout usually means Microsoft took the message but answered slowly, so
     // count it as sent rather than risk a duplicate on the next run.

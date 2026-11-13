@@ -22,6 +22,13 @@ export function LoanOfficerForm({ slug, initial }: { slug: string | null; initia
           <TextInput label="Company NMLS #" name="companyNmls" values={v} />
           <TextInput label="Phone" name="phone" values={v} type="tel" />
           <TextInput label="Email" name="email" values={v} type="email" />
+          <TextInput
+            label="CC on kit emails"
+            name="ccEmails"
+            values={v}
+            placeholder="assistant@lender.com, processor@lender.com"
+            hint="Assistants or anyone else to copy on this loan officer's kit emails. Separate with commas."
+          />
           <TextInput label="Apply / pre-approval URL" name="applyUrl" values={v} type="url" hint="Used for the flyer QR code." />
           <TextInput label="Headshot URL" name="headshotUrl" values={v} type="url" />
           <TextInput label="Logo URL" name="logoUrl" values={v} type="url" hint="PNG or JPG. Shown on the flyer and kit page." />

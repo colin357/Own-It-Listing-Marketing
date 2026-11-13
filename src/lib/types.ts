@@ -50,6 +50,8 @@ export interface LoanOfficer {
   companyNmls?: string;
   phone?: string;
   email?: string;
+  /** Assistants and others copied (CC) on every kit email this loan officer gets. */
+  ccEmails?: string[];
   /** Apply / pre-qualify link used for QR codes and CTAs. */
   applyUrl?: string;
   headshotUrl?: string;
