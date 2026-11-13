@@ -46,6 +46,13 @@ export function ProfileForm({ slug, token, initial }: { slug: string; token: str
         <Input label="Mobile phone" name="phone" values={v} type="tel" autoComplete="tel" />
         <Input label="Email" name="email" values={v} type="email" required hint="Where we send your new kits." />
         <Input
+          label="CC on kit emails"
+          name="ccEmails"
+          values={v}
+          placeholder="assistant@lender.com"
+          hint="Optional. Assistants or teammates to copy. Separate with commas."
+        />
+        <Input
           label="Pre-approval link"
           name="applyUrl"
           values={v}

@@ -52,6 +52,7 @@ export function loanOfficerToValues(lo: LoanOfficer): Record<string, string> {
     companyNmls: s(lo.companyNmls),
     phone: s(lo.phone),
     email: s(lo.email),
+    ccEmails: (lo.ccEmails ?? []).join(", "),
     applyUrl: s(lo.applyUrl),
     headshotUrl: s(lo.headshotUrl),
     headshotCropX: s(lo.headshotCrop?.x),

@@ -46,7 +46,7 @@ export function renderBuiltKitEmail(lo: LoanOfficer, kit: Listing, origin: strin
 export async function sendBuiltKitEmail(lo: LoanOfficer, kit: Listing, origin: string): Promise<void> {
   if (!lo.email || !mailConfigured()) return;
   try {
-    const errors = await sendMail([{ to: [lo.email], ...renderBuiltKitEmail(lo, kit, origin) }]);
+    const errors = await sendMail([{ to: [lo.email], cc: lo.ccEmails, ...renderBuiltKitEmail(lo, kit, origin) }]);
     if (errors.length) console.error("Built-kit email failed", errors);
   } catch (err) {
     console.error("Built-kit email failed", err);
