@@ -30,8 +30,9 @@ function emailParts(ls: Listing[], lo: LoanOfficer | null, origin: string): Part
   const who = firstName(ls[0].agent.name);
   const hi: Part = { kind: "p", text: `Hi${who ? ` ${who}` : ""},` };
   const bye: Part = { kind: "p", text: "Let me know if you'd like anything changed. And send any buyers with financing questions my way!" };
-  // Short signature: the loan officer's name, phone and company (Colin, 2026-11-10).
-  const sigLines = lo ? [lo.name, lo.phone, lo.company].map((x) => x?.trim()).filter(Boolean) : [];
+  // Short signature: the loan officer's name, NMLS #, phone and company (Colin, 2026-11-10; NMLS # added 2026-11-16).
+  const nmls = lo?.nmls?.trim() ? `NMLS #${lo.nmls.trim()}` : "";
+  const sigLines = lo ? [lo.name, nmls, lo.phone, lo.company].map((x) => x?.trim()).filter(Boolean) : [];
   const sig: Part[] = sigLines.length ? [{ kind: "p", text: sigLines.join("\n") }] : [];
   const payments = lo?.showPayments === false ? "" : " and payments";
   const short =
