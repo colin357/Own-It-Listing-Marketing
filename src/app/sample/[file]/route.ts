@@ -2,7 +2,7 @@ import { renderAssets } from "@/lib/render/render";
 import { isAssetName } from "@/lib/render/templates";
 import { sampleKit } from "@/lib/sample";
 
-const SHOWN = ["square", "details", "story", "flyer", "payments", "ways", "qualify", "landscape"];
+const SHOWN = ["square", "details", "story", "flyer", "payments", "ways", "qualify", "bridge", "landscape"];
 
 // Made once per deploy at build time and served as ready files.
 export const dynamic = "force-static";
