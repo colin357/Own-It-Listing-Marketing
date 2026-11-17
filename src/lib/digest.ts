@@ -356,10 +356,18 @@ export async function testDigest(origin: string): Promise<{ loName: string; subj
   return { loName: lo.name, ...renderDigest(lo, kits, origin) };
 }
 
-/** Emails every loan officer their new kits and marks them sent. Returns errors. */
-export async function sendDigests(origin: string): Promise<{ sent: number; errors: string[] }> {
+/**
+ * Emails every loan officer their new kits and marks them sent. Returns errors.
+ * With `loSlug` (admin "Send email now" on one loan officer's page), only that
+ * loan officer is emailed; everyone else's kits keep waiting for 7 AM.
+ */
+export async function sendDigests(origin: string, loSlug?: string): Promise<{ sent: number; errors: string[] }> {
   if (!mailConfigured()) return { sent: 0, errors: [] };
-  const { digests, skipped, repeats } = await pendingDigests(origin);
+  const pending = await pendingDigests(origin);
+  const mine = <T,>(xs: T[], lo: (x: T) => string | undefined) => (loSlug ? xs.filter((x) => lo(x) === loSlug) : xs);
+  const digests = mine(pending.digests, (d) => d.lo.slug);
+  const repeats = mine(pending.repeats, (r) => r.listing.loanOfficerSlug);
+  const skipped = loSlug ? [] : pending.skipped;
   const errors = [...skipped];
   // Repeats never go out; mark them handled so they don't wait in the queue forever.
   for (const r of repeats) {
