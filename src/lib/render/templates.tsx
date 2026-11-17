@@ -1036,6 +1036,76 @@ export function BuydownFlyer(d: RenderData) {
   );
 }
 
+/** Plain-language bridge loan disclosure. No rates or terms: those vary by lender and borrower. */
+const BRIDGE_DISCLAIMER =
+  "Bridge loan availability, terms, rates and fees vary by lender and are subject to credit approval, property valuation, available equity and underwriting guidelines. Not all borrowers will qualify. You may carry payments on both homes until your current home sells. This is not a commitment to lend.";
+
+/** 1275×1650 — "Buy before you sell": how a bridge loan lets a current owner buy this home first. No rates or numbers. */
+export function BridgeLoanFlyer(d: RenderData) {
+  const loFirst = d.lo.name.split(" ")[0];
+  const steps: [string, string][] = [
+    ["Unlock your equity", "A short-term bridge loan taps the equity in the home you own now."],
+    ["Buy this home", "Put it toward your down payment and make an offer that doesn't wait on a sale."],
+    ["Sell on your schedule", "List your current home once you've moved. The bridge loan is paid off when it sells."],
+  ];
+  const compare: [string, string, string][] = [
+    ["Your offer", "Depends on selling your home first", "Can offer without a home-sale contingency"],
+    ["Moving", "Often two moves and a short-term rental", "One move, straight into this home"],
+    ["Down payment", "Waits on your sale proceeds", "Your equity works for you now"],
+    ["Selling", "On the buyer's timeline", "On your timeline, after you're settled"],
+  ];
+  const col = [220, 425, 506];
+  return (
+    <div style={{ display: "flex", flexDirection: "column", width: "100%", height: "100%", background: "#fff" }}>
+      <FinanceHero d={d} kicker="Buy before you sell" lines={["Buy this home", "before you sell."]} height={440} />
+      <div style={{ display: "flex", height: 8, background: d.accent }} />
+      <div style={{ display: "flex", flexDirection: "column", padding: "36px 60px 0", gap: 34 }}>
+        <div style={{ display: "flex", ...body(22, INK) }}>
+          Already own a home? A bridge loan lets you use the equity you've built toward this one, so you don't have to sell first.*
+        </div>
+        <div style={{ display: "flex", gap: 22 }}>
+          {steps.map(([title, text], i) => (
+            <div key={title} style={{ display: "flex", flexDirection: "column", width: (1155 - 44) / 3, gap: 8, borderTop: `3px solid ${INK}`, paddingTop: 14 }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
+                <div style={{ display: "flex", ...head(34, INK), lineHeight: 1 }}>{`0${i + 1}`}</div>
+                <div style={{ display: "flex", ...label(16, INK, 900) }}>{title}</div>
+              </div>
+              <div style={{ display: "flex", ...body(18, MUTED) }}>{text}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", border: `2px solid ${LINE}` }}>
+          <div style={{ display: "flex", background: PAPER, padding: "14px 0" }}>
+            {["", "Selling first", "With a bridge loan"].map((h, i) => (
+              <div key={i} style={{ display: "flex", width: col[i], paddingLeft: 22, ...label(14, i === 2 ? INK : MUTED, i === 2 ? 900 : 700) }}>
+                {h}
+              </div>
+            ))}
+          </div>
+          {compare.map(([name, before, after]) => (
+            <div key={name} style={{ display: "flex", alignItems: "center", borderTop: `1.5px solid ${LINE}`, padding: "21px 0" }}>
+              <div style={{ display: "flex", width: col[0], paddingLeft: 22, ...label(15, INK, 900) }}>{name}</div>
+              <div style={{ display: "flex", width: col[1], paddingLeft: 22, ...body(18, MUTED) }}>{before}</div>
+              <div style={{ display: "flex", width: col[2], paddingLeft: 22, alignItems: "center", gap: 12, ...body(18, INK, 600) }}>
+                <div style={{ display: "flex", width: 8, height: 8, borderRadius: 8, background: INK, flexShrink: 0 }} />
+                {after}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 18, background: PAPER, padding: "16px 22px" }}>
+          <div style={{ display: "flex", ...label(14, INK, 900), flexShrink: 0 }}>Good to know</div>
+          <div style={{ display: "flex", ...body(17, INK) }}>
+            {`Bridge loans are short-term, and approval depends on your equity, credit and income. ${loFirst} can walk you through the costs and what you'd pay while you sell.`}
+          </div>
+        </div>
+      </div>
+      <LoBlock d={d} kicker="See how much of your equity you could use" />
+      <ListedByFooter d={d} disclaimer={BRIDGE_DISCLAIMER} />
+    </div>
+  );
+}
+
 export interface AssetDef {
   label: string;
   use: string;
@@ -1096,6 +1166,17 @@ export const ASSETS = {
     height: 1650,
     render: QualifyFlyer,
     print: true,
+    needsPayments: true,
+  },
+  bridge: {
+    label: "Buy before you sell flyer",
+    use: "Print · 8.5 × 11",
+    size: "1275 × 1650",
+    width: 1275,
+    height: 1650,
+    render: BridgeLoanFlyer,
+    print: true,
+    // No payments on it, but it's a financing flyer: same lenders-only rules (LO on, not once sold).
     needsPayments: true,
   },
 } satisfies Record<string, AssetDef>;
