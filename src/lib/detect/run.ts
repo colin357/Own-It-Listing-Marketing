@@ -134,6 +134,12 @@ export interface RunOptions {
   /** Match and report, but don't save anything or create kits. */
   dryRun?: boolean;
   origin: string;
+  /**
+   * Admin "Run pull" on one loan officer's page: only that loan officer's
+   * areas are searched and only their roster agents' listings become kits.
+   * The scheduled run's stats on the New listings page are left alone.
+   */
+  loSlug?: string;
 }
 
 /**
@@ -177,7 +183,7 @@ async function earlierPhotos(l: SourceListing, known: Detection[]) {
   return null;
 }
 
-export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin }: RunOptions) {
+export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin, loSlug }: RunOptions) {
   const startMs = Date.now();
   const startedAt = new Date(startMs).toISOString();
   const provider = listingProvider();
@@ -185,11 +191,21 @@ export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin
   const [allLos, known] = await Promise.all([loanOfficers.list(), detections.list()]);
   // Self-signup loan officers whose subscription lapsed get no new kits.
   const los = allLos.filter(isActive);
-  const { roster, metros } = await detectionInputs(allLos);
-  if (!roster.length || !metros.length) throw new Error("Upload the agent roster and metros first (Admin → Roster).");
+  const { roster, metros: allMetros } = await detectionInputs(allLos);
+  if (!roster.length || !allMetros.length) throw new Error("Upload the agent roster and metros first (Admin → Roster).");
 
-  const match = buildMatcher(roster, metros);
+  const match = buildMatcher(roster, allMetros);
   const findLo = loFinder(los);
+  let metros = allMetros;
+  if (loSlug) {
+    const only = allLos.find((x) => x.slug === loSlug);
+    if (!only) throw new Error("That loan officer wasn't found.");
+    if (!isActive(only)) throw new Error(`${only.name}'s subscription isn't active, so they get no new kits.`);
+    metros = allMetros.filter((m) => m.loanOfficers.some((n) => findLo(n)?.slug === loSlug));
+    if (!metros.length) throw new Error(`${only.name} has no areas in metros.csv, so there's nothing to pull.`);
+  }
+  /** On a one-LO pull, matches for other loan officers wait for their own run. */
+  const forThisRun = (m: Match) => !loSlug || findLo(m.agent.loanOfficer)?.slug === loSlug;
   const errors: string[] = [];
   // Payment estimates use national average rates; refresh them with every run.
   if (!dryRun) {
@@ -243,7 +259,7 @@ export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin
       scanned++;
       const l: SourceListing = { ...src, pull: "90-days" };
       const m = match(l);
-      if (!m) continue;
+      if (!m || !forThisRun(m)) continue;
       const slug = slugify(`${l.provider}-${l.id}`) + AGED_SUFFIX;
       if (knownSlugs.has(slug)) continue;
       if (findSameHome(l, known) || found.some((f) => sameHome(f.listing, l))) {
@@ -265,7 +281,7 @@ export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin
       scanned++;
       scannedListings.push(l);
       const m = match(l);
-      if (!m) continue;
+      if (!m || !forThisRun(m)) continue;
       const slug = slugify(`${l.provider}-${l.id}`);
       if (knownSlugs.has(slug)) continue;
       // The feed sometimes lists one home twice under different ids (with and
@@ -330,7 +346,7 @@ export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin
     results.push(det);
   }
 
-  if (!dryRun) {
+  if (!dryRun && !loSlug) {
     const open = await detections.list();
 
     // Confident matches that were waiting for their loan officer to be added.
@@ -360,7 +376,7 @@ export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin
   let queued = 0;
   if (!dryRun && photoSource()) {
     try {
-      const gaps = await kitsMissingPhotos(7);
+      const gaps = loSlug ? [] : await kitsMissingPhotos(7);
       await queuePhotos([...results.map((d) => d.slug), ...gaps.map((g) => g.det.slug)]);
       const q = await processPhotoQueue({ deadline: startMs + RUN_BUDGET_MS });
       photosAdded = q.added;
@@ -391,7 +407,8 @@ export async function runDetection({ days = DEFAULT_DAYS, dryRun = false, origin
     errors,
   };
   // A test run saves nothing else, so keep what it found for the admin page to show.
-  await documents.set(dryRun ? "detection-test" : "detection-run", dryRun ? { run, detections: results } : run);
+  // A one-LO pull keeps the scheduled run's numbers on the New listings page.
+  if (!loSlug) await documents.set(dryRun ? "detection-test" : "detection-run", dryRun ? { run, detections: results } : run);
   return { run, detections: results };
 }
 
