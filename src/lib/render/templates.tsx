@@ -2,6 +2,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import type { Listing, LoanOfficer } from "../types";
 import {
+  buyerBenefit,
   cityLine,
   complianceLine,
   formatNumber,
@@ -15,7 +16,7 @@ import {
   streetLine,
 } from "../format";
 import { paymentOptions, type PaymentOptions, type ProgramOptions } from "../mortgage";
-import { activeConcession, concessionSentence, concessionTag } from "../concessions";
+import { activeConcession, BUYDOWNS, concessionDisclaimer, concessionSentence, isTemporary } from "../concessions";
 import { headshotKey } from "../headshotCrop";
 
 /**
@@ -32,7 +33,7 @@ import { headshotKey } from "../headshotCrop";
  */
 
 /** Bump when templates change so cached PNGs/PDFs are re-rendered. */
-export const TEMPLATE_VERSION = "8";
+export const TEMPLATE_VERSION = "9";
 
 /** Cache key for a listing's graphics: changes with the templates, the listing, the rates shown and the LO's headshot crop. */
 export function assetVersion(l: Listing, lo?: Pick<LoanOfficer, "headshotUrl" | "headshotCrop">): string {
@@ -246,8 +247,12 @@ function loPerson(d: RenderData, size: number, color: string, subColor: string, 
 function Compliance({ d, size, color }: { d: RenderData; size: number; color: string }) {
   if (!showsLo(d)) return null;
   const pay = paymentInfo(d.listing, d.lo);
-  const credit = activeConcession(d.listing)
-    ? "Seller concession subject to loan program limits, the purchase contract and lender approval."
+  const c = activeConcession(d.listing);
+  // Temporary buydowns spell out each year's rate and that the buyer qualifies at the note rate.
+  const credit = c
+    ? isTemporary(c.type)
+      ? concessionDisclaimer(c)
+      : "Seller concession subject to loan program limits, the purchase contract and lender approval."
     : null;
   const text = [complianceLine(d.lo), pay?.disclaimer, credit, d.lo.disclaimer].filter(Boolean).join("  ");
   return <div style={{ display: "flex", ...body(size, color), lineHeight: 1.3 }}>{text}</div>;
@@ -308,10 +313,35 @@ function openHousePill(d: RenderData, size: number) {
   return oh ? <Pill text={`Open House · ${oh}`} bg={d.accent} color={d.onAccent} size={size} /> : null;
 }
 
-/** "Seller-paid 2-1 buydown" pill, when the agent has added a seller credit. */
+/**
+ * What the seller's incentive does for the buyer, when the agent has added
+ * one: the year-1 rate with its step-up and APR (see buyerBenefit), then a
+ * plain-words line. Replaces the old "Seller-paid 2-1 buydown" pill, which
+ * buyers didn't understand.
+ */
 function creditPill(d: RenderData, size: number, bg = d.accent, color = d.onAccent) {
-  const c = activeConcession(d.listing);
-  return c ? <Pill text={concessionTag(c)} bg={bg} color={color} size={size} /> : null;
+  const b = buyerBenefit(d.listing, d.lo);
+  if (!b) return null;
+  const big = size * 1.45;
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: size * 0.4,
+        background: bg,
+        borderRadius: size * 0.7,
+        padding: `${size * 0.75}px ${size * 1.1}px`,
+      }}
+    >
+      {b.big.map((t) => (
+        <div key={t} style={{ display: "flex", ...head(big, color), letterSpacing: 0, lineHeight: 1.05 }}>
+          {t}
+        </div>
+      ))}
+      <div style={{ display: "flex", ...body(b.big.length ? size * 1.05 : size * 1.2, color, b.big.length ? 500 : 700), lineHeight: 1.2 }}>{b.line}</div>
+    </div>
+  );
 }
 
 function payLabel(d: RenderData) {
@@ -383,7 +413,7 @@ export function StoryPost(d: RenderData) {
           <Headline l={l} width={900} max={200} color="#fff" />
         </div>
       </div>
-      <div style={{ display: "flex", height: 280, gap: 8, paddingTop: 8 }}>
+      <div style={{ display: "flex", height: activeConcession(l) ? 200 : 280, gap: 8, paddingTop: 8 }}>
         <Photo src={d.photos[1] ?? d.photos[0]} style={{ width: 536, height: "100%" }} />
         <Photo src={d.photos[2] ?? d.photos[0]} style={{ width: 536, height: "100%" }} />
       </div>
@@ -473,10 +503,10 @@ export function DetailsPost(d: RenderData) {
         <div style={{ position: "absolute", top: 44, left: 56, right: 56, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ display: "flex", gap: 12 }}>
             <Pill text={statusLabel(l)} bg="#fff" color={INK} size={20} />
-            {creditPill(d, 20)}
           </div>
           <div style={{ display: "flex", ...label(20, "#fff") }}>{`${l.city}, ${l.state}`}</div>
         </div>
+        <div style={{ position: "absolute", left: 56, bottom: 36, display: "flex" }}>{creditPill(d, 20)}</div>
       </div>
       <div style={{ display: "flex", gap: 6, height: 200, paddingTop: 6 }}>
         {strip.map((src, i) => (
@@ -550,7 +580,7 @@ export function Flyer(d: RenderData) {
         </div>
       </div>
       <div style={{ display: "flex", height: 10, background: d.accent }} />
-      <div style={{ display: "flex", position: "relative", height: 480 }}>
+      <div style={{ display: "flex", position: "relative", height: activeConcession(l) ? 420 : 480 }}>
         <Photo src={p[0]} style={{ ...fill, width: "100%", height: "100%" }} />
         {formatOpenHouse(l) ? <div style={{ position: "absolute", left: 60, bottom: 30, display: "flex" }}>{openHousePill(d, 20)}</div> : null}
       </div>
@@ -574,6 +604,7 @@ export function Flyer(d: RenderData) {
               </div>
             ))}
           </div>
+          {activeConcession(l) ? <div style={{ display: "flex", marginTop: "auto" }}>{creditPill(d, 16, INK, "#fff")}</div> : null}
         </div>
         <div
           style={{
@@ -590,7 +621,6 @@ export function Flyer(d: RenderData) {
           <div style={{ display: "flex", ...label(16, d.onAccent) }}>Offered at</div>
           <div style={{ display: "flex", ...head(58, d.onAccent) }}>{formatPrice(l.price)}</div>
           {pay ? <div style={{ display: "flex", ...label(15, d.onAccent) }}>{pay}</div> : null}
-          {activeConcession(l) ? <div style={{ display: "flex", marginTop: 6 }}>{creditPill(d, 12, "#fff", INK)}</div> : null}
           <div style={{ display: "flex", gap: 16, marginTop: "auto" }}>
             {qrs.map((q) => (
               <div key={q.label} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
@@ -963,7 +993,11 @@ export function BuydownFlyer(d: RenderData) {
   if (!c || !opts) return <div style={{ display: "flex" }} />;
   const width = (1275 - 120 - 22) / 2;
   const lines =
-    c.type === "closing-costs" ? [`${money(c.amount)} toward`, "closing costs."] : ["Seller-paid", `${c.type === "permanent" ? "rate" : c.type}\u00a0buydown.`];
+    c.type === "closing-costs"
+      ? [`${money(c.amount)} toward`, "closing costs."]
+      : c.type === "permanent"
+        ? ["A lower rate", "for 30 years."]
+        : ["Lower payments", `for ${BUYDOWNS[c.type].steps!.length === 1 ? "1 year" : `${BUYDOWNS[c.type].steps!.length} years`}.`];
   const best = Math.max(...opts.scenarios.map((s) => s.concession?.monthlySavings ?? 0));
   return (
     <div style={{ display: "flex", flexDirection: "column", width: "100%", height: "100%", background: "#fff" }}>

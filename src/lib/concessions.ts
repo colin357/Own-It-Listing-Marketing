@@ -227,12 +227,27 @@ export function concessionTag(c: Concession): string {
   return `Seller-paid ${c.type} buydown`;
 }
 
-/** "The seller is offering a 2-1 rate buydown, lowering the payment for the first 2 years." */
+/** "for the first 2 years", "for the first year" */
+function firstYears(type: BuydownType): string {
+  const years = BUYDOWNS[type].steps?.length ?? 0;
+  return years === 1 ? "for the first year" : `for the first ${years} years`;
+}
+
+/**
+ * The buyer's benefit in plain words, for graphics: "Seller pays to lower your
+ * payment for the first 2 years". Buyers don't know what a "2-1 buydown" is.
+ */
+export function concessionBenefit(c: Concession): string {
+  if (c.type === "closing-costs") return "Paid by the seller, so you bring less cash to closing";
+  if (c.type === "permanent") return "Seller pays to lower your rate for the life of the loan";
+  return `Seller pays to lower your rate ${firstYears(c.type)}`;
+}
+
+/** "The seller will pay to lower your monthly payment for the first 2 years (a 2-1 rate buydown)." */
 export function concessionSentence(c: Concession): string {
-  if (c.type === "closing-costs") return `The seller is offering ${dollars(c.amount)} toward the buyer's closing costs.`;
-  if (c.type === "permanent") return "The seller is offering a rate buydown that lowers the buyer's rate for the life of the loan.";
-  const years = BUYDOWNS[c.type].steps!.length;
-  return `The seller is offering a ${c.type} rate buydown, lowering the payment for the first ${years === 1 ? "year" : `${years} years`}.`;
+  if (c.type === "closing-costs") return `The seller will pay ${dollars(c.amount)} of your closing costs, so you bring less cash to closing.`;
+  if (c.type === "permanent") return "The seller will pay to lower your interest rate for the life of the loan (a permanent rate buydown).";
+  return `The seller will pay to lower your monthly payment ${firstYears(c.type)} (a ${c.type} rate buydown).`;
 }
 
 /** Short disclaimer for materials that show a concession. */
