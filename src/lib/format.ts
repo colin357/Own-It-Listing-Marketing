@@ -1,6 +1,7 @@
 import type { Listing, LoanOfficer, PaymentSettings } from "./types";
 import { LISTING_STATUSES } from "./types";
-import { activeConcession, concessionEffect } from "./concessions";
+import { activeConcession, concessionBenefit, concessionEffect } from "./concessions";
+import { principalAndInterest } from "./amortize";
 
 export function slugify(input: string): string {
   return input
@@ -102,9 +103,51 @@ export function paymentInfo(l: Listing, lo: LoanOfficer) {
   }
   return {
     monthly,
+    ratePct: settings.ratePct,
+    aprPct: apr,
+    loanAmount: l.price * (1 - settings.downPaymentPct / 100),
+    termYears: settings.termYears,
     label: `${formatPrice(monthly)}/mo*`,
     disclaimer: `*Est. principal & interest only on a ${settings.termYears}-yr fixed loan at ${settings.ratePct}% interest${apr ? ` (${apr}% APR)` : ""} with ${settings.downPaymentPct}% down.${buydownNote} Excludes taxes, insurance, HOA and PMI.${l.financing?.ratePct != null && l.financing.rateNote ? ` ${l.financing.rateNote}` : ""} Rates subject to change. Not a commitment to lend.`,
   };
+}
+
+/**
+ * What the seller's incentive does for the buyer, for the graphics. Buyers
+ * don't know what a "2-1 buydown" is, so lead with the rate they get:
+ *
+ *   5.255% year 1 · 6.255% year 2
+ *   then 7.255% (7.356% APR)*
+ *   Seller pays to lower your rate for the first 2 years
+ *
+ * Reg Z (12 CFR 1026.24(c), (f)(2)) treats a stated rate as a trigger: an ad
+ * for a rate that changes must give every rate, how long each applies, and
+ * the APR, with equal prominence. So the step-up and APR always sit in the
+ * same type as the year-1 rate, and no rate is shown when there's no APR.
+ */
+export function buyerBenefit(l: Listing, lo: LoanOfficer): { big: string[]; line: string } | null {
+  const c = activeConcession(l);
+  if (!c) return null;
+  const line = concessionBenefit(c);
+  if (c.type === "closing-costs") return { big: [`${formatPrice(c.amount)} toward closing costs`], line };
+  const pay = paymentInfo(l, lo);
+  if (!pay || pay.termYears !== 30) return { big: [], line };
+  if (c.type === "permanent") {
+    // paymentInfo already shows the bought-down payment; show what it saves.
+    const before = principalAndInterest(pay.loanAmount, (l.financing?.ratePct ?? lo.payment?.ratePct)!);
+    const saved = before - pay.monthly;
+    return { big: saved >= 1 ? [`Save ${formatPrice(Math.round(saved))}/mo*`] : [], line };
+  }
+  const e = concessionEffect(
+    { program: "conventional", downPct: lo.payment?.downPaymentPct ?? 20, loanAmount: pay.loanAmount, ratePct: pay.ratePct, principalInterest: pay.monthly, total: pay.monthly, cashToClose: 0 },
+    l.price,
+    c,
+  );
+  if (!e.schedule.length || !pay.aprPct) return { big: [], line };
+  const steps = e.schedule.slice(0, -1).map((y) => `${y.ratePct}% ${y.label.toLowerCase()}`);
+  const note = `then ${pay.ratePct}% (${pay.aprPct}% APR)*`;
+  // One step fits on one line; two or three steps get a line of their own.
+  return { big: steps.length === 1 ? [`${steps[0]}, ${note}`] : [steps.join(" · "), note], line };
 }
 
 export function complianceLine(lo: LoanOfficer): string {
