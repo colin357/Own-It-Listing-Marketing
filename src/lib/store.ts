@@ -169,19 +169,74 @@ async function readMlsFile(): Promise<Record<string, SourceListing>> {
   }
 }
 
+/*
+ * In Redis the index is a set of hashes, one per (month, shard), so a run
+ * writes each hash with one HSET of many fields. Upstash bills (and caps the
+ * free plan at 500k a month) per command, and a pipeline still counts every
+ * command in it: the old one-SET-per-listing index cost ~40k commands per
+ * run and used up the whole month's allowance by Nov 19, 2026.
+ *
+ * A hash lives MLS_INDEX_DAYS after its last write, and lookups check this
+ * month and last month, so a listing stays findable for 30 to 60 days.
+ */
+const MLS_SHARDS = 64;
+/** Fields per HSET, ~3 KB each, well under Upstash's 10 MB request cap. */
+const MLS_HSET_CHUNK = 500;
+/** Extra keys (MLS # without its board prefix) point at the main key instead of repeating the listing. */
+const MLS_ALIAS = "=";
+
+function mlsShard(key: string): number {
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return h % MLS_SHARDS;
+}
+const mlsMonth = (d: Date) => d.toISOString().slice(0, 7);
+const mlsHash = (month: string, key: string) => `mlsidx:${month}:${mlsShard(key)}`;
+
+async function mlsLookup(r: Redis, key: string): Promise<SourceListing | string | null> {
+  const now = new Date();
+  const lastMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 15));
+  for (const month of [mlsMonth(now), mlsMonth(lastMonth)]) {
+    const hit = await r.hget<SourceListing | string>(mlsHash(month, key), key);
+    if (hit) return hit;
+  }
+  // Entries from before the hash index (one key each) until they expire, by mid-January 2027.
+  return (await r.get<SourceListing>(`mls:${key}`)) ?? null;
+}
+
 export const mlsIndex = {
   async get(key: string): Promise<SourceListing | null> {
-    if (redis) return (await redis.get<SourceListing>(`mls:${key}`)) ?? null;
+    if (redis) {
+      const hit = await mlsLookup(redis, key);
+      if (typeof hit !== "string") return hit;
+      if (!hit.startsWith(MLS_ALIAS)) return null;
+      const main = await mlsLookup(redis, hit.slice(MLS_ALIAS.length));
+      return typeof main === "string" ? null : main;
+    }
     return (await readMlsFile())[key] ?? null;
   },
   async putMany(entries: [key: string, listing: SourceListing][]): Promise<void> {
     if (!entries.length) return;
     if (redis) {
-      // Pipelined in chunks so one run of ~20k listings is a few dozen requests.
-      for (let i = 0; i < entries.length; i += 500) {
-        const p = redis.pipeline();
-        for (const [key, l] of entries.slice(i, i + 500)) p.set(`mls:${key}`, l, { ex: MLS_INDEX_DAYS * 86_400 });
-        await p.exec();
+      const month = mlsMonth(new Date());
+      const byHash = new Map<string, Record<string, SourceListing | string>>();
+      const mainKey = new Map<SourceListing, string>();
+      for (const [key, l] of entries) {
+        const first = mainKey.get(l);
+        if (first === undefined) mainKey.set(l, key);
+        const hash = mlsHash(month, key);
+        const fields = byHash.get(hash) ?? {};
+        fields[key] = first === undefined || first === key ? l : `${MLS_ALIAS}${first}`;
+        byHash.set(hash, fields);
+      }
+      // One after another: concurrent commands get auto-pipelined into one
+      // request, which could pass the 10 MB cap (see list() above).
+      for (const [hash, fields] of byHash) {
+        const keys = Object.keys(fields);
+        for (let i = 0; i < keys.length; i += MLS_HSET_CHUNK) {
+          await redis.hset(hash, Object.fromEntries(keys.slice(i, i + MLS_HSET_CHUNK).map((k) => [k, fields[k]])));
+        }
+        await redis.expire(hash, MLS_INDEX_DAYS * 86_400);
       }
       return;
     }
