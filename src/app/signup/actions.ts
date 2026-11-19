@@ -18,10 +18,11 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function signupAction(_prev: SignupState, fd: FormData): Promise<SignupState> {
   const v = (k: string) => String(fd.get(k) ?? "").trim();
-  const values = Object.fromEntries(["name", "email", "phone", "title", "company", "nmls", "companyNmls"].map((k) => [k, v(k)]));
+  const values = Object.fromEntries(["name", "email", "phone", "company", "nmls"].map((k) => [k, v(k)]));
   const issues: string[] = [];
   if (!values.name) issues.push("Enter your full name.");
   if (!EMAIL.test(values.email)) issues.push("Enter a valid email address.");
+  if (values.phone.replace(/\D/g, "").length < 10) issues.push("Enter your mobile phone.");
   if (!values.company) issues.push("Enter your company.");
   if (!/^\d{3,10}$/.test(values.nmls.replace(/\D/g, ""))) issues.push("Enter your NMLS # (numbers only).");
   if (issues.length) return { issues, values };
@@ -37,11 +38,9 @@ export async function signupAction(_prev: SignupState, fd: FormData): Promise<Si
   const input: SignupInput = {
     name: values.name,
     email: values.email,
-    phone: values.phone || undefined,
-    title: values.title || undefined,
+    phone: values.phone,
     company: values.company,
     nmls: values.nmls.replace(/\D/g, ""),
-    companyNmls: values.companyNmls.replace(/\D/g, "") || undefined,
   };
   let url: string;
   try {

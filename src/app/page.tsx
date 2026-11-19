@@ -2,12 +2,28 @@ import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { PLAN } from "@/lib/plan";
+import { DEMO_SLUG } from "@/lib/demo";
+import { configuredOrigin } from "@/lib/site";
 import { SiteFooter, SiteHeader } from "@/components/site/SiteChrome";
 import "./site.css";
 
+const TITLE = "Listing marketing for your agents · Own It Social";
+const DESCRIPTION = `Every time one of your agents lists a home, you get a finished, co-branded marketing kit to send them. $${PLAN.priceUsd}/month, ${PLAN.trialDays}-day free trial.`;
+const ORIGIN = configuredOrigin() ?? "https://kits.ownitsocial.com";
+
 export const metadata: Metadata = {
-  title: "Listing Kits for loan officers · Own It Social",
-  description: `Every time one of your agents lists a home, you get a finished, co-branded marketing kit to send them. $${PLAN.priceUsd}/month, ${PLAN.trialDays}-day free trial.`,
+  title: TITLE,
+  description: DESCRIPTION,
+  alternates: { canonical: `${ORIGIN}/` },
+  openGraph: {
+    type: "website",
+    url: `${ORIGIN}/`,
+    siteName: "Own It Social",
+    title: TITLE,
+    description: DESCRIPTION,
+    images: [{ url: `${ORIGIN}/share-image`, width: 1200, height: 630, alt: "Listing marketing for your agents" }],
+  },
+  twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION, images: [`${ORIGIN}/share-image`] },
 };
 
 const STEPS = [
@@ -48,6 +64,10 @@ const FAQ = [
     a: "Your name, NMLS, company and Equal Housing line go on every graphic that mentions financing. Graphics without financing show the agent only, so agents are happy to post them.",
   },
   {
+    q: "Can my compliance team review it first?",
+    a: "Yes, and we suggest it. Send them the sample kit link. Every graphic that mentions financing shows your name, NMLS #, company and the Equal Housing Opportunity line, and the payment graphics spell out the rate, APR and assumptions behind each number. If your company requires specific disclosure wording, we add it for you during setup.",
+  },
+  {
     q: "What does the agent have to do?",
     a: "Nothing technical. They open the link, download what they want and post. They can add their own headshot and pick a seller incentive with one tap.",
   },
@@ -70,16 +90,17 @@ export default function Home() {
                 <span>for your agents.</span>
               </h1>
               <p className="lead lp-lead">
-                Every time one of your agents takes a new listing, we build a full marketing kit with your name on it. Social
-                posts, flyers, payment breakdowns, captions and emails. You send one link. They post it.
+                Every time one of your agents takes a new listing, we build a full marketing kit with your name on it.{" "}
+                <span className="lp-lead-extra">Social posts, flyers, payment breakdowns, captions and emails. </span>You send one
+                link. They post it.
               </p>
               <div className="actions">
                 <Link className="pill pill-lg" href="/signup">
                   Start {PLAN.trialDays}-day free trial
                 </Link>
-                <a className="textlink" href="#kit">
-                  See what&apos;s in a kit
-                </a>
+                <Link className="textlink" href={`/l/${DEMO_SLUG}`}>
+                  See a sample kit
+                </Link>
               </div>
               <p className="small muted lp-fine">
                 ${PLAN.priceUsd}/month after your trial. Cancel any time.
@@ -108,6 +129,22 @@ export default function Home() {
           </div>
         </section>
 
+        <section className="lp-proof" aria-label="What loan officers say">
+          <div className="wrap lp-proof-inner">
+            <p className="lp-stat">
+              <strong>1,000+</strong>
+              <span>listing kits built in the last 7 days</span>
+            </p>
+            <figure className="lp-quote">
+              <blockquote>
+                &ldquo;I&apos;ve been able to stay in front of my referral partners and build relationships with new ones because of
+                these easy marketing pieces!&rdquo;
+              </blockquote>
+              <figcaption>Ashley Hickmon, Loan Officer</figcaption>
+            </figure>
+          </div>
+        </section>
+
         <section className="lp-how">
           <div className="wrap">
             <h2 className="display display-sm lp-h2">How it works</h2>
@@ -127,7 +164,12 @@ export default function Home() {
           <div className="wrap">
             <div className="lp-kit-head">
               <h2 className="display display-md">Everything for one listing</h2>
-              <p className="lead">One link per listing. Every graphic is made for that home, ready to post the day it lists.</p>
+              <div>
+                <p className="lead">One link per listing. Every graphic is made for that home, ready to post the day it lists.</p>
+                <Link className="pill pill-white lp-kit-demo" href={`/l/${DEMO_SLUG}`}>
+                  Open the sample kit
+                </Link>
+              </div>
             </div>
             <div className="lp-strip">
               {[
