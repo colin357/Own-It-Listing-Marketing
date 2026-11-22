@@ -21,11 +21,17 @@ export function PhotoField({
   initial,
   uploadMode,
   folder,
+  uploadUrl = "/admin/upload",
+  allowUrls = true,
 }: {
   name: string;
   initial: string[];
   uploadMode: "token" | "presigned" | null;
   folder: string;
+  /** Route that hands out upload tokens. */
+  uploadUrl?: string;
+  /** Show the "paste photo URLs" box (admin only). */
+  allowUrls?: boolean;
 }) {
   const [photos, setPhotos] = useState<string[]>(initial);
   const [pasted, setPasted] = useState("");
@@ -47,7 +53,7 @@ export function PhotoField({
         const base = file.name.replace(/\.[^.]+$/, "").replace(/[^a-z0-9-]+/gi, "-").toLowerCase() || "photo";
         const blob = await (uploadMode === "presigned" ? uploadPresigned : upload)(`${folder}/${base}.jpg`, jpeg, {
           access: "public",
-          handleUploadUrl: "/admin/upload",
+          handleUploadUrl: uploadUrl,
           contentType: "image/jpeg",
         });
         setPhotos((p) => [...p, blob.url]);
@@ -89,7 +95,7 @@ export function PhotoField({
       ) : (
         <p className="muted small">No photos yet. The first photo is the cover; the next three fill the collages.</p>
       )}
-      <div className="photo-add">
+      {allowUrls ? <div className="photo-add">
         <textarea
           rows={2}
           placeholder="Paste photo URLs (one per line)"
@@ -99,7 +105,7 @@ export function PhotoField({
         <button type="button" className="btn btn-small" onClick={addUrls} disabled={!pasted.trim()}>
           Add URLs
         </button>
-      </div>
+      </div> : null}
       {uploadMode ? (
         <label className="upload">
           <span className="btn btn-small btn-ghost">Upload photos…</span>

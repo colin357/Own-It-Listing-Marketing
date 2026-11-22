@@ -146,3 +146,15 @@
 .legal p, .legal li { line-height: 1.65; }
 .legal ul { padding-left: 22px; display: grid; gap: 8px; margin: 0 0 16px; }
 .legal a { text-decoration: underline; }
+
+/* LO's private edit-kit page */
+.edit-kit { gap: 0; }
+.edit-kit .acct-section:first-of-type { margin-top: 8px; }
+.edit-kit-text { margin-top: 18px; }
+.edit-kit-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 640px) { .edit-kit-3 { grid-template-columns: 1fr; } }
+.edit-kit-check { display: flex; align-items: center; gap: 10px; margin: 0 0 20px; font-weight: 600; }
+.edit-kit-check input { width: 18px; height: 18px; accent-color: var(--ink); }
+.edit-kit-actions { position: sticky; bottom: 0; background: var(--white); padding: 16px 0; border-top: 1px solid var(--line); }
+.acct-kit-links { display: flex; gap: 14px; align-items: center; }
+.acct-kit-links a { text-decoration: underline; font-weight: 600; font-size: 0.9rem; }

@@ -23,7 +23,7 @@ export async function updateListing(slug: string, raw: Record<string, unknown>):
   if (!(await loanOfficers.get(input.loanOfficerSlug)))
     throw new ValidationError([`Unknown loan officer "${input.loanOfficerSlug}"`]);
   // Slugs are part of links already sent to agents, so they never change.
-  const listing: Listing = { ...input, slug: existing.slug };
+  const listing: Listing = { ...input, builder: existing.builder, slug: existing.slug };
   await listings.save(listing);
   return listing;
 }

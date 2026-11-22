@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { listings, loanOfficers } from "@/lib/store";
-import { buildPath, validAccountToken } from "@/lib/loLinks";
+import { buildPath, kitEditPath, validAccountToken } from "@/lib/loLinks";
 import { loanOfficerToValues } from "@/lib/formValues";
 import { billingLabel, CONTACT_EMAIL, isActive, PLAN } from "@/lib/plan";
 import { formatPrice, streetLine } from "@/lib/format";
@@ -23,7 +23,7 @@ export default async function AccountPage({ params, searchParams }: PageProps<"/
   const active = isActive(lo);
   const self = !!lo.billing;
   const build = buildPath(slug);
-  const recent = all.filter((l) => l.loanOfficerSlug === slug).slice(0, 8);
+  const recent = all.filter((l) => l.loanOfficerSlug === slug).slice(0, 20);
 
   return (
     <div className="site">
@@ -82,11 +82,18 @@ export default async function AccountPage({ params, searchParams }: PageProps<"/
             <ul className="acct-kits">
               {recent.map((l) => (
                 <li key={l.slug}>
-                  <Link href={`/l/${l.slug}`}>
-                    <strong>{streetLine(l)}</strong>, {l.city}
-                  </Link>
-                  <span className="muted small">
-                    {formatPrice(l.price)} · {l.builder ?? l.agent.name}
+                  <div>
+                    <Link href={`/l/${l.slug}`}>
+                      <strong>{streetLine(l)}</strong>, {l.city}
+                    </Link>
+                    <br />
+                    <span className="muted small">
+                      {formatPrice(l.price)} · {l.builder ?? l.agent.name}
+                    </span>
+                  </div>
+                  <span className="acct-kit-links">
+                    <Link href={`/l/${l.slug}`}>View</Link>
+                    {kitEditPath(l.slug) ? <Link href={kitEditPath(l.slug)!}>Edit</Link> : null}
                   </span>
                 </li>
               ))}

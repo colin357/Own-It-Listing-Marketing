@@ -51,3 +51,26 @@ export function accountPath(slug: string): string | null {
   const token = accountToken(slug);
   return token ? `/account/${slug}/${token}` : null;
 }
+
+/**
+ * A loan officer's private "edit this kit" page, /edit/<kit slug>/<token>.
+ * The token covers one kit only, so a forwarded kit email can't open the
+ * loan officer's account or their other kits.
+ */
+export function kitEditToken(kitSlug: string): string | null {
+  const s = secret();
+  return s ? createHmac("sha256", s).update(`edit:${kitSlug}`).digest("base64url").slice(0, 20) : null;
+}
+
+export function validKitEditToken(kitSlug: string, token: string): boolean {
+  const expected = kitEditToken(kitSlug);
+  if (!expected) return false;
+  const a = Buffer.from(expected);
+  const b = Buffer.from(token);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+export function kitEditPath(kitSlug: string): string | null {
+  const token = kitEditToken(kitSlug);
+  return token ? `/edit/${kitSlug}/${token}` : null;
+}
