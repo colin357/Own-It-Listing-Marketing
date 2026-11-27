@@ -72,6 +72,11 @@ code { font-size: 0.88em; background: var(--paper); border: 1px solid var(--line
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 22px; }
 
 /* ---------- kit: nav ---------- */
+.demo-bar { background: #0A0A0A; color: #F4F3F1; font-size: 0.9rem; }
+.demo-bar-inner { display: flex; align-items: center; justify-content: space-between; gap: 12px 24px; flex-wrap: wrap; padding-top: 12px; padding-bottom: 12px; }
+.demo-bar p { margin: 0; }
+@media (max-width: 560px) { .demo-bar { font-size: 0.8rem; } .demo-bar-inner { padding-top: 10px; padding-bottom: 10px; } .demo-bar-cta { padding: 8px 14px; font-size: 0.68rem; } }
+.demo-bar-cta { font-family: var(--display); font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.75rem; color: #0A0A0A; background: #F4F3F1; border-radius: 999px; padding: 10px 18px; text-decoration: none; white-space: nowrap; }
 .nav { background: var(--white); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 10; }
 .nav-inner { display: flex; align-items: center; gap: 28px; min-height: 72px; }
 .wordmark { font-family: var(--display); font-weight: 900; text-transform: uppercase; letter-spacing: -0.03em; font-size: 1.6rem; line-height: 1; margin-right: auto; }
