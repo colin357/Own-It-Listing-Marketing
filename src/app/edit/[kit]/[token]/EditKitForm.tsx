@@ -28,12 +28,15 @@ export function EditKitForm({
   initial,
   uploadMode,
   defaultRate,
+  isBuilder,
 }: {
   kit: string;
   token: string;
   initial: Record<string, string>;
   uploadMode: "token" | "presigned" | null;
   defaultRate?: number;
+  /** New construction: the builder stands in for the listing agent. */
+  isBuilder?: boolean;
 }) {
   const [state, action, pending] = useActionState<EditKitState, FormData>(saveKitEditAction.bind(null, kit, token), {});
   const v = state.values ?? initial;
@@ -82,6 +85,31 @@ export function EditKitForm({
             <textarea name="highlights" rows={4} defaultValue={v.highlights} placeholder={"Renovated kitchen\nBig backyard"} />
             <small>One per line. Up to 6 show on the graphics.</small>
           </label>
+        </div>
+      </section>
+
+      <section className="acct-section">
+        <h2 className="site-h2">{isBuilder ? "Builder" : "Listing agent"}</h2>
+        <p className="muted acct-intro">
+          {isBuilder
+            ? "Shows on the graphics and the buyer page in place of a listing agent."
+            : "Shows on the graphics and the buyer page. The email isn't shown on any graphic. It fills the To line of your Email kit draft."}
+        </p>
+        <div className="site-grid">
+          {isBuilder ? (
+            <>
+              <Input label="Builder" name="builder" values={v} required />
+              <Input label="Sales contact" name="agentName" values={v} hint="Optional. Leave blank to show the builder's name." />
+            </>
+          ) : (
+            <>
+              <Input label="Agent name" name="agentName" values={v} required autoComplete="off" />
+              <Input label="Brokerage" name="agentBrokerage" values={v} />
+            </>
+          )}
+          <Input label="Phone" name="agentPhone" values={v} type="tel" hint={isBuilder ? undefined : "Also used for your Text kit button."} />
+          <Input label="Email" name="agentEmail" values={v} type="email" />
+          {isBuilder ? null : <Input label="License #" name="agentLicense" values={v} />}
         </div>
       </section>
 

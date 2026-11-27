@@ -40,13 +40,14 @@ export default async function EditKitPage({ params }: PageProps<"/edit/[kit]/[to
         <EditKitForm
           kit={kit}
           token={token}
-          initial={listingToValues(listing)}
+          initial={{ ...listingToValues(listing), builder: listing.builder ?? "" }}
+          isBuilder={!!listing.builder}
           uploadMode={blobMode()}
           defaultRate={lo?.payment?.ratePct}
         />
         <p className="small muted acct-keep">
-          This page&apos;s address is private to you. Don&apos;t forward it: anyone with it can edit this kit. To change the address
-          or the agent, reply to your kit email.
+          This page&apos;s address is private to you. Don&apos;t forward it: anyone with it can edit this kit. To change the address,
+          reply to your kit email.
         </p>
       </main>
       <SiteFooter />
