@@ -5,6 +5,7 @@ import { firstName, formatPrice, statsLine, streetLine } from "./format";
 import { agentEmailAddress, agentEmailBody, agentEmailSubject, groupByAgent, mailtoHref } from "./agentEmail";
 import { textPageHref } from "./textLink";
 import { mailConfigured, sendMail, type Mail } from "./mail";
+import { kitEditPath } from "./loLinks";
 import type { Detection } from "./detect/types";
 import { sameHome } from "./detect/dedupe";
 import type { Listing, LoanOfficer } from "./types";
@@ -60,6 +61,12 @@ function button(href: string, label: string, primary: boolean): string {
       <td align="center" bgcolor="${bg}" style="background-color:${bg};border:2px solid #0a0a0a;border-radius:6px;mso-padding-alt:11px 20px">
         <a href="${esc(href)}"${target} style="display:inline-block;padding:11px 20px;color:${fg};font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:18px;font-weight:700;text-decoration:none;white-space:nowrap">${label}</a>
       </td></tr></table>`;
+}
+
+/** "Edit kit": the loan officer's private edit page for this one kit. */
+function editButton(l: Listing, origin: string): string[] {
+  const path = kitEditPath(l.slug);
+  return path ? [button(`${origin}${path}`, "Edit kit", false)] : [];
 }
 
 /**
@@ -151,6 +158,7 @@ export function kitCard(l: Listing, lo: LoanOfficer, origin: string): string {
     ${buttonRows(sendButtons(emailButton([l], lo, origin, "Email kit"), textButton(l.agent.phone, agentMessage(l, kitUrl), "Text kit", origin)), sendNote([l], "the kit link"), [
       button(kitUrl, "Open kit", false),
       button(`${kitUrl}/download`, "Download all", false),
+      ...editButton(l, origin),
     ])}
   </td></tr>
 </table>`;
@@ -179,7 +187,8 @@ function groupKitRow(l: Listing, origin: string, last: boolean): string {
         <p style="margin:4px 0 12px;font-size:14px;color:#5b5b5b">${esc(facts)}</p>
         <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
           <td valign="top" style="padding:0 8px 0 0">${button(kitUrl, "Open kit", false)}</td>
-          <td valign="top">${button(`${kitUrl}/download`, "Download all", false)}</td>
+          <td valign="top" style="padding:0 8px 0 0">${button(`${kitUrl}/download`, "Download all", false)}</td>
+          ${editButton(l, origin).map((b) => `<td valign="top">${b}</td>`).join("")}
         </tr></table>
       </td></tr>
     </table>
